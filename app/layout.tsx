@@ -9,12 +9,14 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body className="bg-gray-50 text-gray-900 antialiased">
+      <body className="bg-[#0d1117] text-slate-100 antialiased">
         <div className="min-h-screen">
-          <header className="border-b border-gray-200 bg-white">
+          <header className="border-b border-[#1e293b] bg-[#111827]">
             <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
-              <a href="/" className="text-lg font-bold tracking-tight">BizSim</a>
-              <span className="text-xs text-gray-400">AI 기반 경영 시뮬레이션</span>
+              <a href="/" className="text-lg font-bold tracking-tight text-teal-400">
+                BizSim
+              </a>
+              <span className="text-xs text-slate-400">AI 기반 경영 시뮬레이션</span>
             </div>
           </header>
           <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>

@@ -1,8 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenAI } from '@google/genai';
 import { getPersona, buildSystemPrompt } from '@/lib/personas';
 import type { PersonaId, Decisions, ChatMessage } from '@/lib/types';
 
-const anthropic = new Anthropic();
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 export async function POST(req: Request) {
   try {
@@ -24,22 +24,27 @@ export async function POST(req: Request) {
 
     const systemPrompt = buildSystemPrompt(persona, decisions);
 
-    const stream = anthropic.messages.stream({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 300,
-      system: systemPrompt,
-      messages: messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      })),
+    const contents = messages.map((m) => ({
+      role: m.role === 'assistant' ? 'model' : ('user' as 'user' | 'model'),
+      parts: [{ text: m.content }],
+    }));
+
+    const response = await ai.models.generateContentStream({
+      model: 'gemini-2.0-flash',
+      config: {
+        systemInstruction: systemPrompt,
+        maxOutputTokens: 300,
+      },
+      contents,
     });
 
     const readable = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
-        for await (const event of stream) {
-          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-            controller.enqueue(encoder.encode(event.delta.text));
+        for await (const chunk of response) {
+          const text = chunk.text ?? '';
+          if (text) {
+            controller.enqueue(encoder.encode(text));
           }
         }
         controller.close();

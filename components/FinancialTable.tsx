@@ -20,7 +20,7 @@ export function FinancialTable({ rows }: Props) {
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="text-xs text-gray-400 border-b border-gray-200">
+        <tr className="text-xs text-slate-400 border-b border-[#334155]">
           <th className="text-left py-2 font-medium">계정</th>
           <th className="text-right py-2 font-medium">금액 (₩)</th>
         </tr>
@@ -31,14 +31,14 @@ export function FinancialTable({ rows }: Props) {
             key={i}
             className={
               row.isTotal
-                ? 'font-bold border-t-2 border-gray-900'
+                ? 'font-bold border-t-2 border-teal-400 text-slate-100'
                 : row.isHeader
-                  ? 'text-gray-500 font-semibold'
-                  : 'border-b border-gray-50'
+                  ? 'text-slate-300 font-semibold'
+                  : 'border-b border-[#1e293b] text-slate-200'
             }
           >
             <td className={`py-1.5 ${row.isHeader ? 'pt-3' : ''}`}>{row.label}</td>
-            <td className={`py-1.5 text-right tabular-nums ${row.value < 0 ? 'text-red-500' : ''}`}>
+            <td className={`py-1.5 text-right tabular-nums ${row.value < 0 ? 'text-red-400' : ''}`}>
               {row.isHeader ? '' : `₩${formatKRW(row.value)}`}
             </td>
           </tr>

@@ -67,61 +67,102 @@ export default function InterviewPage() {
     router.push('/play/results');
   };
 
+  const dnaByPersona = {
+    jiyeon: { segment: 'budget', price: 'HIGH', brand: 'LOW', innovation: 'MODERATE' },
+    minsoo: { segment: 'early-adopter', price: 'LOW', brand: 'MODERATE', innovation: 'HIGH' },
+    soonja: { segment: 'brand-loyal', price: 'MODERATE', brand: 'HIGH', innovation: 'LOW' },
+  } as const;
+
+  const dna = dnaByPersona[selectedPersona];
+
+  const badgeClass = (value: 'HIGH' | 'MODERATE' | 'LOW') => {
+    if (value === 'HIGH') return 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+    if (value === 'MODERATE') return 'bg-teal-500/20 text-teal-300 border-teal-500/40';
+    return 'bg-slate-500/20 text-slate-300 border-slate-500/40';
+  };
+
   return (
-    <div>
-      <div className="text-xs text-gray-400 mb-4">
+    <div className="space-y-4">
+      <div className="text-xs text-slate-400">
         소비자에게 직접 물어보세요. 제품 반응, 가격 민감도, 구매 의향을 대화로 파악할 수 있습니다.
       </div>
 
-      <div className="grid grid-cols-[200px_1fr] gap-4 min-h-[450px]">
-        <div className="border-r border-gray-200 pr-4 space-y-2">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">소비자 페르소나</h3>
+      <div className="grid gap-4 min-h-[520px] lg:grid-cols-[220px_1fr_200px]">
+        <div className="space-y-2">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase mb-3">소비자 페르소나</h3>
           {PERSONAS.map((p) => (
             <button
               key={p.id}
               onClick={() => setSelectedPersona(p.id)}
-              className={`w-full text-left border rounded-lg p-3 transition-colors ${
+              className={`w-full text-left border rounded-lg p-3 transition-colors bg-[#1e293b] ${
                 selectedPersona === p.id
-                  ? 'border-gray-900 bg-gray-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-teal-400'
+                  : 'border-[#334155] hover:border-slate-500'
               }`}
             >
               <div className="text-lg mb-1">{p.emoji}</div>
-              <div className="text-sm font-semibold">{p.name} ({p.age})</div>
-              <div className="text-xs text-gray-400 mt-0.5">{p.description}</div>
-              {chatHistories[p.id].length > 0 && (
-                <div className="text-xs text-blue-500 mt-1">
-                  {Math.floor(chatHistories[p.id].length / 2)}회 대화
-                </div>
-              )}
+              <div className="text-sm font-semibold text-white">{p.name} ({p.age})</div>
+              <div className="text-xs text-slate-400 mt-0.5">{p.description}</div>
+              <div className="mt-2 inline-flex rounded-full border border-[#334155] px-2 py-0.5 text-[11px] text-slate-300">
+                {Math.floor(chatHistories[p.id].length / 2)}회 대화
+              </div>
             </button>
           ))}
         </div>
 
-        <ChatInterface
-          personaId={selectedPersona}
-          personaName={persona.name}
-          messages={messages}
-          decisions={decisions}
-          onSend={handleSend}
-          isLoading={isLoading}
-        />
+        <div className="rounded-xl border border-[#334155] bg-[#111827] p-4">
+          <div className="mb-3 flex items-center justify-between border-b border-[#1e293b] pb-3">
+            <div className="text-sm font-semibold text-white">{persona.name}</div>
+            <span className="rounded-full border border-teal-500/40 bg-teal-500/20 px-2 py-0.5 text-[11px] font-semibold text-teal-300">
+              ONLINE
+            </span>
+          </div>
+          <ChatInterface
+            personaId={selectedPersona}
+            personaName={persona.name}
+            messages={messages}
+            decisions={decisions}
+            onSend={handleSend}
+            isLoading={isLoading}
+          />
+        </div>
+
+        <aside className="rounded-xl border border-[#334155] bg-[#111827] p-3">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase mb-3">Persona DNA</h3>
+          <div className="mb-3 rounded-lg border border-[#334155] bg-[#1e293b] px-2 py-1.5 text-xs text-slate-300">
+            세그먼트: <span className="font-semibold text-white">{dna.segment}</span>
+          </div>
+          <div className="space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">가격민감도</span>
+              <span className={`rounded-full border px-2 py-0.5 ${badgeClass(dna.price)}`}>{dna.price}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">브랜드충성도</span>
+              <span className={`rounded-full border px-2 py-0.5 ${badgeClass(dna.brand)}`}>{dna.brand}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">혁신수용도</span>
+              <span className={`rounded-full border px-2 py-0.5 ${badgeClass(dna.innovation)}`}>{dna.innovation}</span>
+            </div>
+          </div>
+        </aside>
       </div>
 
-      <div className="flex items-center justify-between border-t border-gray-200 pt-4 mt-4">
-        <span className="text-xs text-gray-400">
+      <div className="flex items-center justify-between border-t border-[#1e293b] pt-4 mt-4">
+        <span className="text-xs text-slate-400">
           인터뷰 완료 후 시뮬레이션을 실행하세요
         </span>
         <div className="flex gap-2">
           <button
             onClick={() => router.push('/play')}
-            className="border border-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
+            className="border border-[#334155] text-slate-300 px-4 py-2 rounded-lg text-sm hover:bg-[#0f172a]"
           >
             ← 의사결정 수정
           </button>
           <button
             onClick={handleRunSimulation}
-            className="bg-gray-900 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800"
+            className="bg-teal-500 text-slate-950 px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-teal-400"
           >
             시뮬레이션 실행 →
           </button>
