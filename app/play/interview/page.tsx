@@ -38,7 +38,7 @@ export default function InterviewPage() {
       });
 
       if (!res.ok) {
-        appendToLastAssistant(selectedPersona, '(API 연결 오류 — .env.local에 ANTHROPIC_API_KEY를 설정해주세요)');
+        appendToLastAssistant(selectedPersona, '(API 연결 오류 — Vercel 환경변수에 GEMINI_API_KEY를 설정해주세요)');
         setIsLoading(false);
         return;
       }

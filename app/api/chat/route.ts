@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     }));
 
     const response = await ai.models.generateContentStream({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       config: {
         systemInstruction: systemPrompt,
         maxOutputTokens: 300,
