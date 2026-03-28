@@ -16,15 +16,15 @@ export function DecisionSlider({ label, value, min, max, step, unit, formatValue
   const percent = ((value - min) / (max - min)) * 100;
 
   return (
-    <div className="border border-[#334155] rounded-lg p-4 bg-[#1e293b]">
-      <div className="text-xs text-slate-400 mb-1">{label}</div>
-      <div className="text-xl font-bold text-white">
-        {display} <span className="text-sm font-normal text-slate-400">{unit}</span>
+    <div className="border border-[#3c4a45] rounded-lg p-4 bg-[#112036]">
+      <div className="text-xs text-[#bacac3] mb-1">{label}</div>
+      <div className="text-xl font-[Manrope] font-bold text-[#d6e3ff]">
+        {display} <span className="text-sm font-normal text-[#bacac3]">{unit}</span>
       </div>
       <div className="relative mt-3">
-        <div className="h-1 bg-[#334155] rounded-full">
+        <div className="h-1 bg-[#27354c] rounded-full">
           <div
-            className="h-1 bg-teal-400 rounded-full"
+            className="h-1 bg-[#38debb] rounded-full"
             style={{ width: `${percent}%` }}
           />
         </div>
@@ -41,3 +41,5 @@ export function DecisionSlider({ label, value, min, max, step, unit, formatValue
     </div>
   );
 }
+
+

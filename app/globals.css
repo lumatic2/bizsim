@@ -1,24 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
-input[type='range'] {
+input[type=range] {
   -webkit-appearance: none;
-  appearance: none;
+  background: transparent;
 }
-
-input[type='range']::-webkit-slider-thumb {
-  appearance: none;
-  width: 16px;
+input[type=range]::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 4px;
+  background: #27354c;
+  border-radius: 2px;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
   height: 16px;
+  width: 16px;
   border-radius: 50%;
-  background: #2dd4bf;
+  background: #38debb;
+  margin-top: -6px;
+  box-shadow: 0 0 10px rgba(56, 222, 187, 0.4);
   cursor: pointer;
 }
-
-input[type='range']::-moz-range-thumb {
+input[type=range]::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #2dd4bf;
+  background: #38debb;
   border: none;
+  box-shadow: 0 0 10px rgba(56, 222, 187, 0.4);
   cursor: pointer;
 }
