@@ -72,8 +72,8 @@ export default function FinancialsPage() {
             onClick={() => setTab(t.id)}
             className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
               tab === t.id
-                ? 'bg-[#38debb] border-[#38debb] text-[#041329] font-semibold'
-                : 'bg-[#112036] border-[#3c4a45] text-[#bacac3] hover:bg-[#0d1c32]'
+                ? 'bg-gray-900 border-gray-900 text-white font-semibold'
+                : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
             }`}
           >
             {t.label}
@@ -81,17 +81,17 @@ export default function FinancialsPage() {
         ))}
       </div>
 
-      <div className="bg-[#112036] border border-[#3c4a45] rounded-lg p-4">
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
         <FinancialTable rows={tableRows} />
       </div>
 
-      <div className="bg-[#112036] border border-[#3c4a45] rounded-lg p-4 mt-4">
-        <h3 className="text-sm font-semibold text-[#d6e3ff] mb-2">인사이트</h3>
-        <div className="space-y-1 text-sm text-[#bacac3]">
-          <p className="pl-3 border-l-2 border-[#38debb]">
+      <div className="bg-white border border-gray-200 rounded-lg p-4 mt-4">
+        <h3 className="text-sm font-semibold text-gray-900 mb-2">인사이트</h3>
+        <div className="space-y-1 text-sm text-gray-500">
+          <p className="pl-3 border-l-2 border-gray-900">
             매출총이익률: {pnl.revenue > 0 ? ((pnl.grossProfit / pnl.revenue) * 100).toFixed(1) : 0}%
           </p>
-          <p className="pl-3 border-l-2 border-[#38debb]">
+          <p className="pl-3 border-l-2 border-gray-900">
             {pnl.operatingProfit > 0
               ? `영업이익 ₩${(pnl.operatingProfit / 1_000_000).toFixed(0)}M 달성`
               : `영업손실 ₩${(Math.abs(pnl.operatingProfit) / 1_000_000).toFixed(0)}M — 비용 구조 재검토 필요`}
@@ -99,16 +99,16 @@ export default function FinancialsPage() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-[#3c4a45]/20 pt-4 mt-4">
+      <div className="flex items-center justify-between border-t border-gray-200/20 pt-4 mt-4">
         <button
           onClick={() => router.push('/play/results')}
-          className="border border-[#3c4a45] text-[#bacac3] px-4 py-2 rounded-lg text-sm hover:bg-[#0d1c32]"
+          className="border border-gray-200 text-gray-500 px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
         >
           ← 결과 대시보드
         </button>
         <button
           onClick={() => router.push('/play')}
-          className="bg-[#38debb] text-[#041329] px-6 py-2.5 rounded-lg text-sm font-semibold hover:brightness-110"
+          className="bg-gray-900 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:brightness-110"
         >
           다음 라운드 →
         </button>

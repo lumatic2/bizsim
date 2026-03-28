@@ -29,13 +29,13 @@ export function ChatInterface({ personaName, messages, onSend, isLoading }: Prop
 
   return (
     <div className="flex flex-col h-full">
-      <div className="text-xs text-[#bacac3] mb-2 italic">
+      <div className="text-xs text-gray-500 mb-2 italic">
         {personaName}님에게 자유롭게 질문하세요. 제품 반응, 가격 민감도, 구매 의향을 파악할 수 있습니다.
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-3 mb-4 min-h-[300px] max-h-[400px]">
         {messages.length === 0 && (
-          <div className="text-sm text-[#bacac3]/70 text-center mt-20">
+          <div className="text-sm text-gray-500/70 text-center mt-20">
             대화를 시작해보세요
           </div>
         )}
@@ -44,8 +44,8 @@ export function ChatInterface({ personaName, messages, onSend, isLoading }: Prop
             key={i}
             className={`max-w-[80%] px-3 py-2 rounded-xl text-sm leading-relaxed ${
               msg.role === 'user'
-                ? 'ml-auto bg-[#38debb]/20 border border-[#38debb]/30 text-[#d6e3ff] rounded-br-sm'
-                : 'bg-[#112036] text-[#d6e3ff] rounded-bl-sm border border-[#3c4a45]'
+                ? 'ml-auto bg-gray-900/20 border border-gray-900/30 text-gray-900 rounded-br-sm'
+                : 'bg-white text-gray-900 rounded-bl-sm border border-gray-200'
             }`}
           >
             {msg.content}
@@ -60,13 +60,13 @@ export function ChatInterface({ personaName, messages, onSend, isLoading }: Prop
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="소비자에게 질문하세요..."
-          className="flex-1 border border-[#3c4a45] bg-[#0d1c32] text-[#d6e3ff] placeholder-[#bacac3]/70 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#38debb]"
+          className="flex-1 border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-500/70 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-900"
           disabled={isLoading}
         />
         <button
           type="submit"
           disabled={isLoading || !input.trim()}
-          className="bg-[#38debb] hover:brightness-110 text-[#041329] px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-40"
+          className="bg-gray-900 hover:brightness-110 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-40"
         >
           {isLoading ? '...' : '전송'}
         </button>
