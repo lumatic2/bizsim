@@ -16,7 +16,7 @@ function formatKRW(value: number): string {
 
 export default function ResultsPage() {
   const router = useRouter();
-  const { results, decisions } = useGameStore();
+  const { results, decisions, currentRound } = useGameStore();
   const [competitorTab, setCompetitorTab] = useState<'market' | 'ads' | 'channels'>('market');
 
   if (!results) {
@@ -27,15 +27,15 @@ export default function ResultsPage() {
   return (
     <div className="max-w-5xl mx-auto">
       <h1 className="text-2xl font-[Manrope] font-bold mb-2" style={{ color: 'var(--biz-text)' }}>
-        시뮬레이션 결과
+        {currentRound}분기 시뮬레이션 결과
       </h1>
       <p style={{ color: 'var(--biz-text-muted)' }} className="text-sm mb-6">
-        1분기 경영 시뮬레이션의 최종 결과입니다.
+        {currentRound}분기 경영 시뮬레이션의 최종 결과입니다.
       </p>
 
       <div className="grid grid-cols-4 gap-3 mb-6">
-        <MetricCard label="시장점유율" value={`${results.marketShare}%`} delta="시장 진입" deltaUp />
-        <MetricCard label="매출" value={formatKRW(results.revenue)} delta="Round 1" deltaUp={results.revenue > 0} />
+        <MetricCard label="시장점유율" value={`${results.marketShare}%`} delta={`Round ${currentRound}`} deltaUp />
+        <MetricCard label="매출" value={formatKRW(results.revenue)} delta={`Round ${currentRound}`} deltaUp={results.revenue > 0} />
         <MetricCard
           label="영업이익"
           value={formatKRW(results.operatingProfit)}
@@ -148,11 +148,12 @@ export default function ResultsPage() {
             {/* 경쟁사 */}
             <Scatter
               name="경쟁사"
-              data={[
-                { x: -8, y: 10, z: 150, name: '경쟁사A' },
-                { x: 6,  y: -4, z: 130, name: '경쟁사B' },
-                { x: -3, y: 2,  z: 110, name: '경쟁사C' },
-              ]}
+              data={results.competitors.map((c) => ({
+                x: 15 - ((c.price - 200_000) / 300_000) * 30,
+                y: (c.quality - 3) * 4,
+                z: 150,
+                name: c.name,
+              }))}
               fill="#94a3b8"
             />
 
@@ -254,86 +255,34 @@ export default function ResultsPage() {
                 )}
               </tr>
 
-              {/* 경쟁사 A */}
-              <tr style={{ borderBottomColor: 'var(--biz-border)' }} className="border-b">
-                <td className="px-3 py-2" style={{ color: 'var(--biz-text)' }}>경쟁사A</td>
-                {competitorTab === 'market' && (
-                  <>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>22%</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>₩4.8B</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>22,000대</td>
-                  </>
-                )}
-                {competitorTab === 'ads' && (
-                  <>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>480M</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>420M</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>300M</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>1,200M</td>
-                  </>
-                )}
-                {competitorTab === 'channels' && (
-                  <>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>30%</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>50%</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>20%</td>
-                  </>
-                )}
-              </tr>
-
-              {/* 경쟁사 B */}
-              <tr style={{ borderBottomColor: 'var(--biz-border)' }} className="border-b">
-                <td className="px-3 py-2" style={{ color: 'var(--biz-text)' }}>경쟁사B</td>
-                {competitorTab === 'market' && (
-                  <>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>18%</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>₩3.2B</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>18,000대</td>
-                  </>
-                )}
-                {competitorTab === 'ads' && (
-                  <>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>350M</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>280M</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>170M</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>800M</td>
-                  </>
-                )}
-                {competitorTab === 'channels' && (
-                  <>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>55%</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>35%</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>10%</td>
-                  </>
-                )}
-              </tr>
-
-              {/* 경쟁사 C */}
-              <tr>
-                <td className="px-3 py-2" style={{ color: 'var(--biz-text)' }}>경쟁사C</td>
-                {competitorTab === 'market' && (
-                  <>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>15%</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>₩2.1B</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>15,000대</td>
-                  </>
-                )}
-                {competitorTab === 'ads' && (
-                  <>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>200M</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>180M</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>120M</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>500M</td>
-                  </>
-                )}
-                {competitorTab === 'channels' && (
-                  <>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>40%</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>40%</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>20%</td>
-                  </>
-                )}
-              </tr>
+              {/* 경쟁사 동적 렌더링 */}
+              {results.competitors.map((c, idx) => (
+                <tr key={c.name} style={{ borderBottomColor: 'var(--biz-border)' }} className={idx === results.competitors.length - 1 ? '' : 'border-b'}>
+                  <td className="px-3 py-2" style={{ color: 'var(--biz-text)' }}>{c.name}</td>
+                  {competitorTab === 'market' && (
+                    <>
+                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{c.marketShare}%</td>
+                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{formatKRW(c.revenue)}</td>
+                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{c.unitsSold.toLocaleString()}대</td>
+                    </>
+                  )}
+                  {competitorTab === 'ads' && (
+                    <>
+                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(c.adBudget * 0.4 / 1_000_000).toFixed(0)}M</td>
+                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(c.adBudget * 0.35 / 1_000_000).toFixed(0)}M</td>
+                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(c.adBudget * 0.25 / 1_000_000).toFixed(0)}M</td>
+                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(c.adBudget / 1_000_000).toFixed(0)}M</td>
+                    </>
+                  )}
+                  {competitorTab === 'channels' && (
+                    <>
+                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{c.channels.online}%</td>
+                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{c.channels.mart}%</td>
+                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{c.channels.direct}%</td>
+                    </>
+                  )}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

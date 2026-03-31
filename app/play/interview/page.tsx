@@ -7,11 +7,12 @@ import { ChatInterface } from '@/components/ChatInterface';
 import { PERSONAS } from '@/lib/personas';
 import { runSimulation } from '@/lib/game-engine';
 import { generateFinancials } from '@/lib/financial-mapper';
+import { getMarketSize } from '@/lib/competitor-ai';
 
 export default function InterviewPage() {
   const router = useRouter();
   const {
-    decisions, chatHistories, selectedPersona,
+    decisions, chatHistories, selectedPersona, competitors, currentRound, qualityCap, previousBS,
     setSelectedPersona, addMessage, appendToLastAssistant,
     setResults, setFinancials,
   } = useGameStore();
@@ -60,9 +61,10 @@ export default function InterviewPage() {
   };
 
   const handleRunSimulation = () => {
-    const results = runSimulation(decisions);
+    const marketSize = getMarketSize(currentRound);
+    const results = runSimulation(decisions, competitors, marketSize, qualityCap);
     setResults(results);
-    const financials = generateFinancials(decisions, results);
+    const financials = generateFinancials(decisions, results, previousBS);
     setFinancials(financials);
     router.push('/play/results');
   };

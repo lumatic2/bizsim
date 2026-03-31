@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { generateFinancials } from '../financial-mapper';
 import { runSimulation } from '../game-engine';
+import { INITIAL_COMPETITORS, getMarketSize } from '../competitor-ai';
 import type { Decisions } from '../types';
 
 const DEFAULT_DECISIONS: Decisions = {
@@ -13,8 +14,10 @@ const DEFAULT_DECISIONS: Decisions = {
 };
 
 describe('generateFinancials', () => {
-  const results = runSimulation(DEFAULT_DECISIONS);
-  const financials = generateFinancials(DEFAULT_DECISIONS, results);
+  const marketSize = getMarketSize(1);
+  const qualityCap = 3;
+  const results = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap);
+  const financials = generateFinancials(DEFAULT_DECISIONS, results, null);
 
   it('revenue matches units sold times price', () => {
     expect(financials.pnl.revenue).toBe(results.unitsSold * DEFAULT_DECISIONS.price);

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/stores/game-store';
 import { DecisionSlider } from '@/components/DecisionSlider';
 import { runSimulation } from '@/lib/game-engine';
+import { getMarketSize } from '@/lib/competitor-ai';
 
 function formatBillion(v: number) {
   return (v / 1_000_000_000).toFixed(1);
@@ -16,8 +17,11 @@ function formatMan(v: number) {
 
 export default function DecisionPage() {
   const router = useRouter();
-  const { decisions, setDecisions, setChannels } = useGameStore();
-  const preview = useMemo(() => runSimulation(decisions), [decisions]);
+  const { decisions, setDecisions, setChannels, currentRound, competitors, qualityCap } = useGameStore();
+  const preview = useMemo(() => {
+    const marketSize = getMarketSize(currentRound);
+    return runSimulation(decisions, competitors, marketSize, qualityCap);
+  }, [decisions, currentRound, competitors, qualityCap]);
 
   const totalCost =
     decisions.adBudget +
@@ -47,21 +51,20 @@ export default function DecisionPage() {
   };
 
   const competitorData = useMemo(() => {
-    const fixed = [
-      { name: '글로벌테크', revenueB: 4.8 },
-      { name: '혁신전자', revenueB: 3.2 },
-      { name: '로컬베스트', revenueB: 2.1 },
-    ];
+    const companyData = competitors.map((c) => ({
+      name: c.name,
+      revenueB: Number((c.revenue / 1_000_000_000).toFixed(1)),
+    }));
     const ours = { name: '우리회사', revenueB: Number((preview.revenue / 1_000_000_000).toFixed(1)) };
-    return [ours, ...fixed];
-  }, [preview.revenue]);
+    return [ours, ...companyData];
+  }, [preview.revenue, competitors]);
 
   const maxRevenueB = Math.max(...competitorData.map((c) => c.revenueB), 1);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div style={{ background: 'var(--biz-primary-light)', borderColor: 'var(--biz-primary)' }} className="border rounded-lg p-3 mb-2 flex items-center gap-4 text-sm">
-        <span style={{ background: 'var(--biz-primary)', color: 'white' }} className="px-2 py-0.5 rounded text-xs font-semibold">Round 1</span>
+        <span style={{ background: 'var(--biz-primary)', color: 'white' }} className="px-2 py-0.5 rounded text-xs font-semibold">Round {currentRound}</span>
         <span style={{ color: 'var(--biz-text)' }}>한국 스마트홈 가전 시장 · 2026년 · 경기 보통 · 경쟁사 3개</span>
       </div>
 
@@ -113,7 +116,7 @@ export default function DecisionPage() {
             label="품질 목표"
             value={decisions.quality}
             min={1}
-            max={5}
+            max={Math.floor(qualityCap)}
             step={1}
             unit=""
             formatValue={(v) => '★'.repeat(v) + '☆'.repeat(5 - v)}

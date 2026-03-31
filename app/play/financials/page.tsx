@@ -9,7 +9,7 @@ type Tab = 'pnl' | 'bs' | 'cf';
 
 export default function FinancialsPage() {
   const router = useRouter();
-  const { financials, results } = useGameStore();
+  const { financials, results, currentRound, maxRounds, advanceRound, gameOver } = useGameStore();
   const [tab, setTab] = useState<Tab>('pnl');
 
   if (!financials || !results) {
@@ -69,7 +69,7 @@ export default function FinancialsPage() {
         재무제표
       </h1>
       <p style={{ color: 'var(--biz-text-muted)' }} className="text-sm mb-6">
-        1분기 경영 성과를 재무제표로 분석하세요.
+        {currentRound}분기 경영 성과를 재무제표로 분석하세요.
       </p>
 
       <div className="flex gap-2 mb-4">
@@ -116,11 +116,18 @@ export default function FinancialsPage() {
           ← 결과 대시보드
         </button>
         <button
-          onClick={() => router.push('/play')}
+          onClick={() => {
+            advanceRound();
+            if (currentRound >= maxRounds) {
+              router.push('/');
+            } else {
+              router.push('/play');
+            }
+          }}
           style={{ background: 'var(--biz-primary)' }}
           className="text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-all"
         >
-          다음 라운드 →
+          {currentRound >= maxRounds ? '게임 종료' : '다음 라운드 →'}
         </button>
       </div>
     </div>

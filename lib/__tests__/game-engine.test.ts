@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { runSimulation } from '../game-engine';
+import { INITIAL_COMPETITORS, getMarketSize } from '../competitor-ai';
 import type { Decisions } from '../types';
 
 const DEFAULT_DECISIONS: Decisions = {
@@ -12,40 +13,43 @@ const DEFAULT_DECISIONS: Decisions = {
 };
 
 describe('runSimulation', () => {
+  const marketSize = getMarketSize(1);
+  const qualityCap = 3;
+
   it('returns valid market share between 0 and 100', () => {
-    const result = runSimulation(DEFAULT_DECISIONS);
+    const result = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap);
     expect(result.marketShare).toBeGreaterThanOrEqual(0);
     expect(result.marketShare).toBeLessThanOrEqual(100);
   });
 
   it('returns positive revenue when units are sold', () => {
-    const result = runSimulation(DEFAULT_DECISIONS);
+    const result = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap);
     expect(result.revenue).toBeGreaterThan(0);
     expect(result.unitsSold).toBeGreaterThan(0);
   });
 
   it('sells no more than production quantity', () => {
     const decisions = { ...DEFAULT_DECISIONS, production: 100 };
-    const result = runSimulation(decisions);
+    const result = runSimulation(decisions, INITIAL_COMPETITORS, marketSize, qualityCap);
     expect(result.unitsSold).toBeLessThanOrEqual(100);
   });
 
   it('lower price increases demand', () => {
-    const expensive = runSimulation({ ...DEFAULT_DECISIONS, price: 500_000 });
-    const cheap = runSimulation({ ...DEFAULT_DECISIONS, price: 200_000 });
+    const expensive = runSimulation({ ...DEFAULT_DECISIONS, price: 500_000 }, INITIAL_COMPETITORS, marketSize, qualityCap);
+    const cheap = runSimulation({ ...DEFAULT_DECISIONS, price: 200_000 }, INITIAL_COMPETITORS, marketSize, qualityCap);
     const expTotal = Object.values(expensive.segmentDemand).reduce((s, d) => s + d, 0);
     const cheapTotal = Object.values(cheap.segmentDemand).reduce((s, d) => s + d, 0);
     expect(cheapTotal).toBeGreaterThan(expTotal);
   });
 
   it('higher quality increases satisfaction', () => {
-    const low = runSimulation({ ...DEFAULT_DECISIONS, quality: 1 });
-    const high = runSimulation({ ...DEFAULT_DECISIONS, quality: 5 });
+    const low = runSimulation({ ...DEFAULT_DECISIONS, quality: 1 }, INITIAL_COMPETITORS, marketSize, qualityCap);
+    const high = runSimulation({ ...DEFAULT_DECISIONS, quality: 3 }, INITIAL_COMPETITORS, marketSize, qualityCap);
     expect(high.satisfaction).toBeGreaterThan(low.satisfaction);
   });
 
   it('zero ad budget still produces some demand', () => {
-    const result = runSimulation({ ...DEFAULT_DECISIONS, adBudget: 0 });
+    const result = runSimulation({ ...DEFAULT_DECISIONS, adBudget: 0 }, INITIAL_COMPETITORS, marketSize, qualityCap);
     const totalDemand = Object.values(result.segmentDemand).reduce((s, d) => s + d, 0);
     expect(totalDemand).toBeGreaterThan(0);
   });
@@ -59,9 +63,15 @@ describe('runSimulation', () => {
       channels: { online: 100, mart: 0, direct: 0 },
       quality: 1,
     };
-    const result = runSimulation(extreme);
+    const result = runSimulation(extreme, INITIAL_COMPETITORS, marketSize, qualityCap);
     for (const demand of Object.values(result.segmentDemand)) {
       expect(demand).toBeGreaterThanOrEqual(0);
     }
+  });
+
+  it('includes competitors in results', () => {
+    const result = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap);
+    expect(result.competitors).toBeDefined();
+    expect(result.competitors.length).toBe(3);
   });
 });

@@ -1,7 +1,8 @@
 'use client';
 
 import { create } from 'zustand';
-import type { GameState, Decisions, SimulationResults, FinancialStatements, PersonaId, ChatMessage } from '@/lib/types';
+import type { GameState, Decisions, SimulationResults, FinancialStatements, PersonaId, ChatMessage, CompetitorState, RoundSnapshot, CarryForwardBS } from '@/lib/types';
+import { INITIAL_COMPETITORS, updateCompetitorDecisions, qualityCapFromRd } from '@/lib/competitor-ai';
 
 const DEFAULT_DECISIONS: Decisions = {
   price: 349_000,
@@ -21,16 +22,25 @@ type GameActions = {
   setSelectedPersona: (id: PersonaId) => void;
   addMessage: (personaId: PersonaId, message: ChatMessage) => void;
   appendToLastAssistant: (personaId: PersonaId, chunk: string) => void;
-  reset: () => void;
+  advanceRound: () => void;
+  resetGame: () => void;
 };
 
 const initialState: GameState = {
   step: 'decision',
+  currentRound: 1,
+  maxRounds: 6,
   decisions: DEFAULT_DECISIONS,
   results: null,
   financials: null,
   chatHistories: { jiyeon: [], minsoo: [], soonja: [] },
   selectedPersona: 'jiyeon',
+  roundHistory: [],
+  competitors: INITIAL_COMPETITORS,
+  cumulativeRd: 0,
+  qualityCap: 3,
+  previousBS: null,
+  gameOver: false,
 };
 
 export const useGameStore = create<GameState & GameActions>((set) => ({
@@ -65,5 +75,50 @@ export const useGameStore = create<GameState & GameActions>((set) => ({
       return { chatHistories: { ...s.chatHistories, [personaId]: history } };
     }),
 
-  reset: () => set(initialState),
+  advanceRound: () => set((s) => {
+    if (!s.results || !s.financials) return s;
+
+    const snapshot: RoundSnapshot = {
+      round: s.currentRound,
+      decisions: s.decisions,
+      results: s.results,
+      financials: s.financials,
+      competitors: s.results.competitors,
+      marketSize: s.results.marketSize,
+      cumulativeRd: s.cumulativeRd,
+      qualityCap: s.qualityCap,
+    };
+
+    const newCumulativeRd = s.cumulativeRd + s.decisions.rdBudget;
+    const newQualityCap = qualityCapFromRd(newCumulativeRd);
+    const bs = s.financials.bs;
+    const newPreviousBS: CarryForwardBS = {
+      cash: bs.cash,
+      debt: bs.debt,
+      equity: bs.equity,
+      retainedEarnings: bs.retainedEarnings,
+    };
+    const nextRound = s.currentRound + 1;
+    const newCompetitors = updateCompetitorDecisions(
+      s.results.competitors,
+      nextRound,
+      s.results.marketShare,
+    );
+
+    return {
+      roundHistory: [...s.roundHistory, snapshot],
+      currentRound: nextRound,
+      cumulativeRd: newCumulativeRd,
+      qualityCap: newQualityCap,
+      previousBS: newPreviousBS,
+      competitors: newCompetitors,
+      results: null,
+      financials: null,
+      chatHistories: { jiyeon: [], minsoo: [], soonja: [] },
+      step: 'decision' as const,
+      gameOver: nextRound > s.maxRounds,
+    };
+  }),
+
+  resetGame: () => set(initialState),
 }));

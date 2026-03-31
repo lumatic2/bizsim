@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { useGameStore } from '@/stores/game-store';
 
 type DashboardTile = {
   title: string;
@@ -19,6 +22,8 @@ const tiles: DashboardTile[] = [
 ];
 
 export default function Home() {
+  const { currentRound, maxRounds, roundHistory, gameOver } = useGameStore();
+
   return (
     <div className="max-w-5xl mx-auto">
       <div
@@ -29,8 +34,43 @@ export default function Home() {
           color: 'var(--biz-text)',
         }}
       >
-        Round 1 · 한국 스마트홈 가전 · 경기 보통
+        Round {currentRound} · 한국 스마트홈 가전 · 경기 보통
       </div>
+
+      {gameOver && roundHistory.length > 0 && (
+        <div
+          className="rounded-xl px-6 py-4 mb-6"
+          style={{
+            background: 'var(--biz-primary-light)',
+            border: '1px solid var(--biz-primary)',
+            color: 'var(--biz-text)',
+          }}
+        >
+          <h2 className="text-lg font-semibold mb-3">게임 종료 - 최종 결과</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <div style={{ color: 'var(--biz-text-muted)' }} className="text-xs mb-1">최종 라운드</div>
+              <div className="text-2xl font-bold" style={{ color: 'var(--biz-primary)' }}>{maxRounds}</div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--biz-text-muted)' }} className="text-xs mb-1">마지막 점유율</div>
+              <div className="text-2xl font-bold" style={{ color: 'var(--biz-primary)' }}>{roundHistory[roundHistory.length - 1]?.results.marketShare || 0}%</div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--biz-text-muted)' }} className="text-xs mb-1">누적 영업이익</div>
+              <div className="text-2xl font-bold" style={{ color: 'var(--biz-primary)' }}>
+                ₩{(roundHistory.reduce((sum, snap) => sum + snap.results.operatingProfit, 0) / 1_000_000_000).toFixed(1)}B
+              </div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--biz-text-muted)' }} className="text-xs mb-1">평균 고객만족도</div>
+              <div className="text-2xl font-bold" style={{ color: 'var(--biz-primary)' }}>
+                {(roundHistory.reduce((sum, snap) => sum + snap.results.satisfaction, 0) / roundHistory.length).toFixed(0)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {tiles.map((tile) => (

@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useGameStore } from '@/stores/game-store';
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { currentRound, maxRounds } = useGameStore();
 
   const isActive = (href: string) => pathname === href;
 
@@ -100,7 +102,10 @@ export function Sidebar() {
         <div style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }} className="border-t pt-4">
           <div className="text-[10px] text-white/50 mb-2">경영 시뮬레이션</div>
           <div style={{ background: 'var(--biz-primary)' }} className="inline-block rounded-full px-2 py-1 text-[10px] font-semibold text-white">
-            Round 1
+            Round {currentRound}
+          </div>
+          <div className="text-[10px] text-white/50 mt-1">
+            {currentRound} / {maxRounds}
           </div>
         </div>
       </div>

@@ -28,6 +28,35 @@ export type ChatMessage = {
   content: string;
 };
 
+export type CompetitorState = {
+  name: string;
+  price: number;
+  adBudget: number;
+  quality: number;
+  channels: { online: number; mart: number; direct: number };
+  marketShare: number;
+  revenue: number;
+  unitsSold: number;
+};
+
+export type RoundSnapshot = {
+  round: number;
+  decisions: Decisions;
+  results: SimulationResults;
+  financials: FinancialStatements;
+  competitors: CompetitorState[];
+  marketSize: number;
+  cumulativeRd: number;
+  qualityCap: number;
+};
+
+export type CarryForwardBS = {
+  cash: number;
+  debt: number;
+  equity: number;
+  retainedEarnings: number;
+};
+
 export type SimulationResults = {
   marketShare: number;
   revenue: number;
@@ -35,6 +64,8 @@ export type SimulationResults = {
   satisfaction: number;
   unitsSold: number;
   segmentDemand: Record<PersonaId, number>;
+  marketSize: number;
+  competitors: CompetitorState[];
 };
 
 export type PnL = {
@@ -76,9 +107,17 @@ export type FinancialStatements = {
 
 export type GameState = {
   step: 'decision' | 'interview' | 'results' | 'financials';
+  currentRound: number;
+  maxRounds: number;
   decisions: Decisions;
   results: SimulationResults | null;
   financials: FinancialStatements | null;
   chatHistories: Record<PersonaId, ChatMessage[]>;
   selectedPersona: PersonaId;
+  roundHistory: RoundSnapshot[];
+  competitors: CompetitorState[];
+  cumulativeRd: number;
+  qualityCap: number;
+  previousBS: CarryForwardBS | null;
+  gameOver: boolean;
 };
