@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/stores/game-store';
 import { MetricCard } from '@/components/MetricCard';
 import { PERSONAS } from '@/lib/personas';
+import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, ZAxis } from 'recharts';
 
 function formatKRW(value: number): string {
   const abs = Math.abs(value);
@@ -14,7 +16,8 @@ function formatKRW(value: number): string {
 
 export default function ResultsPage() {
   const router = useRouter();
-  const { results } = useGameStore();
+  const { results, decisions } = useGameStore();
+  const [competitorTab, setCompetitorTab] = useState<'market' | 'ads' | 'channels'>('market');
 
   if (!results) {
     router.push('/play');
@@ -98,6 +101,241 @@ export default function ResultsPage() {
               results.segmentDemand[p.id] > results.segmentDemand[best.id] ? p : best
             ).name} 세그먼트에서 가장 높은 반응을 보였습니다.
           </p>
+        </div>
+      </div>
+
+      {/* 포지셔닝 맵 */}
+      <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 mb-6">
+        <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--biz-text)' }}>포지셔닝 맵 — Economy × Performance</h3>
+        <ResponsiveContainer width="100%" height={300}>
+          <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--biz-border)" />
+            <XAxis
+              type="number"
+              dataKey="x"
+              label={{ value: 'Economy (저가 ↔ 고가)', position: 'insideBottomRight', offset: -10 }}
+              style={{ fontSize: '12px', fill: 'var(--biz-text-muted)' }}
+            />
+            <YAxis
+              type="number"
+              dataKey="y"
+              label={{ value: 'Performance', angle: -90, position: 'insideLeft' }}
+              style={{ fontSize: '12px', fill: 'var(--biz-text-muted)' }}
+            />
+            <ZAxis type="number" dataKey="z" range={[50, 200]} />
+            <Tooltip
+              cursor={{ strokeDasharray: '3 3' }}
+              contentStyle={{ background: 'var(--biz-card)', border: '1px solid var(--biz-border)', borderRadius: '6px' }}
+              labelStyle={{ color: 'var(--biz-text)' }}
+              formatter={(value) => value}
+              labelFormatter={(label) => `${label}`}
+            />
+            <ReferenceLine x={0} stroke="var(--biz-border)" strokeDasharray="5 5" />
+            <ReferenceLine y={0} stroke="var(--biz-border)" strokeDasharray="5 5" />
+
+            {/* 우리 회사 */}
+            <Scatter
+              name="우리회사"
+              data={[{
+                x: 15 - ((decisions.price - 200_000) / 300_000) * 30,
+                y: (decisions.quality - 3) * 4,
+                z: 200,
+                name: '우리회사'
+              }]}
+              fill="#0066cc"
+            />
+
+            {/* 경쟁사 */}
+            <Scatter
+              name="경쟁사"
+              data={[
+                { x: -8, y: 10, z: 150, name: '경쟁사A' },
+                { x: 6,  y: -4, z: 130, name: '경쟁사B' },
+                { x: -3, y: 2,  z: 110, name: '경쟁사C' },
+              ]}
+              fill="#94a3b8"
+            />
+
+            {/* 이상점 (고객 세그먼트 중심) */}
+            <Scatter
+              name="이상점"
+              data={[
+                { x: -10, y: 12, z: 80, name: '얼리어답터' },
+                { x: -5,  y: 5,  z: 80, name: '브랜드충성' },
+                { x: 10,  y: -5, z: 80, name: '가성비추구' },
+              ]}
+              fill="#fbbf24"
+              fillOpacity={0.7}
+            />
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* 경쟁사 인텔리전스 */}
+      <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 mb-6">
+        <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--biz-text)' }}>경쟁사 인텔리전스</h3>
+
+        {/* 탭 버튼 */}
+        <div className="flex gap-2 mb-4 border-b" style={{ borderBottomColor: 'var(--biz-border)' }}>
+          {[
+            { id: 'market' as const, label: '시장 현황' },
+            { id: 'ads' as const, label: '광고 지출' },
+            { id: 'channels' as const, label: '유통 채널' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setCompetitorTab(tab.id)}
+              className="px-4 py-2 text-sm font-medium transition-colors rounded-t-lg"
+              style={{
+                background: competitorTab === tab.id ? 'var(--biz-primary)' : 'transparent',
+                color: competitorTab === tab.id ? 'white' : 'var(--biz-text-muted)',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 테이블 */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ background: 'var(--biz-primary)' }}>
+                <th className="text-left px-3 py-2 text-white font-semibold">회사</th>
+                {competitorTab === 'market' && (
+                  <>
+                    <th className="text-right px-3 py-2 text-white font-semibold">시장점유율</th>
+                    <th className="text-right px-3 py-2 text-white font-semibold">매출</th>
+                    <th className="text-right px-3 py-2 text-white font-semibold">판매량</th>
+                  </>
+                )}
+                {competitorTab === 'ads' && (
+                  <>
+                    <th className="text-right px-3 py-2 text-white font-semibold">온라인</th>
+                    <th className="text-right px-3 py-2 text-white font-semibold">마트</th>
+                    <th className="text-right px-3 py-2 text-white font-semibold">직영</th>
+                    <th className="text-right px-3 py-2 text-white font-semibold">합계</th>
+                  </>
+                )}
+                {competitorTab === 'channels' && (
+                  <>
+                    <th className="text-right px-3 py-2 text-white font-semibold">온라인</th>
+                    <th className="text-right px-3 py-2 text-white font-semibold">마트</th>
+                    <th className="text-right px-3 py-2 text-white font-semibold">직영</th>
+                  </>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {/* 우리 회사 */}
+              <tr style={{ background: '#fef9c3' }}>
+                <td className="px-3 py-2" style={{ color: 'var(--biz-text)' }}>우리회사</td>
+                {competitorTab === 'market' && (
+                  <>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{results.marketShare}%</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{formatKRW(results.revenue)}</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{results.unitsSold.toLocaleString()}대</td>
+                  </>
+                )}
+                {competitorTab === 'ads' && (
+                  <>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(decisions.adBudget * 0.4 / 1_000_000).toFixed(0)}M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(decisions.adBudget * 0.35 / 1_000_000).toFixed(0)}M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(decisions.adBudget * 0.25 / 1_000_000).toFixed(0)}M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(decisions.adBudget / 1_000_000).toFixed(0)}M</td>
+                  </>
+                )}
+                {competitorTab === 'channels' && (
+                  <>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{decisions.channels.online}%</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{decisions.channels.mart}%</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{decisions.channels.direct}%</td>
+                  </>
+                )}
+              </tr>
+
+              {/* 경쟁사 A */}
+              <tr style={{ borderBottomColor: 'var(--biz-border)' }} className="border-b">
+                <td className="px-3 py-2" style={{ color: 'var(--biz-text)' }}>경쟁사A</td>
+                {competitorTab === 'market' && (
+                  <>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>22%</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>₩4.8B</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>22,000대</td>
+                  </>
+                )}
+                {competitorTab === 'ads' && (
+                  <>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>480M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>420M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>300M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>1,200M</td>
+                  </>
+                )}
+                {competitorTab === 'channels' && (
+                  <>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>30%</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>50%</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>20%</td>
+                  </>
+                )}
+              </tr>
+
+              {/* 경쟁사 B */}
+              <tr style={{ borderBottomColor: 'var(--biz-border)' }} className="border-b">
+                <td className="px-3 py-2" style={{ color: 'var(--biz-text)' }}>경쟁사B</td>
+                {competitorTab === 'market' && (
+                  <>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>18%</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>₩3.2B</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>18,000대</td>
+                  </>
+                )}
+                {competitorTab === 'ads' && (
+                  <>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>350M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>280M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>170M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>800M</td>
+                  </>
+                )}
+                {competitorTab === 'channels' && (
+                  <>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>55%</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>35%</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>10%</td>
+                  </>
+                )}
+              </tr>
+
+              {/* 경쟁사 C */}
+              <tr>
+                <td className="px-3 py-2" style={{ color: 'var(--biz-text)' }}>경쟁사C</td>
+                {competitorTab === 'market' && (
+                  <>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>15%</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>₩2.1B</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>15,000대</td>
+                  </>
+                )}
+                {competitorTab === 'ads' && (
+                  <>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>200M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>180M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>120M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>500M</td>
+                  </>
+                )}
+                {competitorTab === 'channels' && (
+                  <>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>40%</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>40%</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>20%</td>
+                  </>
+                )}
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
