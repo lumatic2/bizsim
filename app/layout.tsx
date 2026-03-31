@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Sidebar } from '@/components/Sidebar';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -9,17 +10,24 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko" className="font-[Inter]">
-      <body className="bg-gray-50 text-gray-900 font-[Inter] antialiased">
-        <div className="min-h-screen">
-          <header className="border-b border-gray-200/20 bg-white">
-            <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
-              <a href="/" className="text-lg font-[Manrope] font-bold tracking-tight text-gray-900">
-                BizSim
-              </a>
-              <span className="text-xs text-gray-500">AI 기반 경영 시뮬레이션</span>
-            </div>
-          </header>
-          <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+      <body style={{ background: 'var(--biz-bg)', color: 'var(--biz-text)' }} className="text-gray-900 font-[Inter] antialiased">
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <div className="flex-1 flex flex-col">
+            <header style={{ background: 'white', borderBottomColor: 'var(--biz-border)' }} className="border-b">
+              <div className="px-6 py-4 flex items-center justify-between">
+                <h1 className="text-lg font-[Manrope] font-bold" style={{ color: 'var(--biz-text)' }}>
+                  경영 시뮬레이션
+                </h1>
+                <span className="text-xs" style={{ color: 'var(--biz-text-muted)' }}>
+                  Round 1 · 2026년 1분기
+                </span>
+              </div>
+            </header>
+            <main style={{ background: 'var(--biz-bg)' }} className="flex-1 p-6">
+              {children}
+            </main>
+          </div>
         </div>
       </body>
     </html>

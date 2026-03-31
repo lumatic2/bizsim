@@ -1,6 +1,26 @@
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
+:root {
+  --biz-primary: #0066cc;
+  --biz-primary-hover: #0052a3;
+  --biz-primary-light: #e8f0fe;
+  --biz-success: #1a7a3e;
+  --biz-success-bg: #e6f4ec;
+  --biz-danger: #c0392b;
+  --biz-danger-bg: #fceae9;
+  --biz-warning: #b8860b;
+  --biz-warning-bg: #fff8e1;
+  --biz-bg: #f4f6f9;
+  --biz-sidebar: #1e2a3a;
+  --biz-sidebar-hover: #2d3f54;
+  --biz-sidebar-active: #0066cc;
+  --biz-card: #ffffff;
+  --biz-border: #e2e8f0;
+  --biz-text: #1a202c;
+  --biz-text-muted: #718096;
+}
+
 input[type=range] {
   -webkit-appearance: none;
   background: transparent;
@@ -8,7 +28,7 @@ input[type=range] {
 input[type=range]::-webkit-slider-runnable-track {
   width: 100%;
   height: 4px;
-  background: #e5e7eb;
+  background: var(--biz-border);
   border-radius: 2px;
 }
 input[type=range]::-webkit-slider-thumb {
@@ -16,7 +36,7 @@ input[type=range]::-webkit-slider-thumb {
   height: 16px;
   width: 16px;
   border-radius: 50%;
-  background: #111827;
+  background: var(--biz-primary);
   margin-top: -6px;
   cursor: pointer;
 }
@@ -24,7 +44,7 @@ input[type=range]::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #111827;
+  background: var(--biz-primary);
   border: none;
   cursor: pointer;
 }

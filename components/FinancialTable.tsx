@@ -20,29 +20,34 @@ export function FinancialTable({ rows }: Props) {
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="text-xs text-gray-500 border-b border-gray-200">
+        <tr style={{ background: 'var(--biz-primary)', color: 'white' }}>
           <th className="text-left py-2 font-medium">계정</th>
           <th className="text-right py-2 font-medium">금액 (₩)</th>
         </tr>
       </thead>
       <tbody>
-        {rows.map((row, i) => (
-          <tr
-            key={i}
-            className={
-              row.isTotal
-                ? 'font-bold border-t-2 border-gray-900 text-gray-900'
-                : row.isHeader
-                  ? 'text-gray-500 font-semibold'
-                  : 'border-b border-gray-200/20 text-gray-900'
-            }
-          >
-            <td className={`py-1.5 ${row.isHeader ? 'pt-3' : ''}`}>{row.label}</td>
-            <td className={`py-1.5 text-right tabular-nums ${row.value < 0 ? 'text-red-400' : ''}`}>
-              {row.isHeader ? '' : `₩${formatKRW(row.value)}`}
-            </td>
-          </tr>
-        ))}
+        {rows.map((row, i) => {
+          const isPositive = row.value >= 0;
+          const textColor = row.value < 0 ? 'var(--biz-danger)' : row.value > 0 ? 'var(--biz-success)' : 'var(--biz-text)';
+
+          return (
+            <tr
+              key={i}
+              style={
+                row.isTotal
+                  ? { background: '#f0f7ff', color: 'var(--biz-text)', borderTop: '2px solid var(--biz-primary)' }
+                  : row.isHeader
+                    ? { color: 'var(--biz-text-muted)' }
+                    : { borderBottom: '1px solid var(--biz-border)', color: 'var(--biz-text)' }
+              }
+            >
+              <td className={`py-1.5 ${row.isHeader ? 'pt-3' : ''} font-medium`}>{row.label}</td>
+              <td className={`py-1.5 text-right tabular-nums ${row.isTotal ? 'font-bold' : ''}`} style={{ color: row.isHeader ? 'var(--biz-text-muted)' : textColor }}>
+                {row.isHeader ? '' : `₩${formatKRW(row.value)}`}
+              </td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );

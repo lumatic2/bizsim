@@ -59,13 +59,13 @@ export default function DecisionPage() {
   const maxRevenueB = Math.max(...competitorData.map((c) => c.revenueB), 1);
 
   return (
-    <div className="space-y-6">
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-2 flex items-center gap-4 text-sm">
-        <span className="bg-gray-900/20 text-gray-900 px-2 py-0.5 rounded text-xs border border-gray-900/40">Round 1</span>
-        <span>한국 스마트홈 가전 시장 · 2026년 · 경기 보통 · 경쟁사 3개</span>
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <div style={{ background: 'var(--biz-primary-light)', borderColor: 'var(--biz-primary)' }} className="border rounded-lg p-3 mb-2 flex items-center gap-4 text-sm">
+        <span style={{ background: 'var(--biz-primary)', color: 'white' }} className="px-2 py-0.5 rounded text-xs font-semibold">Round 1</span>
+        <span style={{ color: 'var(--biz-text)' }}>한국 스마트홈 가전 시장 · 2026년 · 경기 보통 · 경쟁사 3개</span>
       </div>
 
-      <h2 className="text-xs font-[Manrope] font-bold text-gray-500 uppercase tracking-wider">의사결정 레버</h2>
+      <h2 className="text-xs font-[Manrope] font-bold uppercase tracking-wider" style={{ color: 'var(--biz-text-muted)' }}>의사결정 레버</h2>
 
       <div className="grid gap-4 lg:grid-cols-[2fr_3fr]">
         <div className="space-y-4">
@@ -120,15 +120,15 @@ export default function DecisionPage() {
             onChange={(v) => setDecisions({ quality: v })}
           />
 
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <div className="text-xs text-gray-500 mb-3">유통 채널 배분</div>
+          <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4">
+            <div className="text-xs mb-3" style={{ color: 'var(--biz-text-muted)' }}>유통 채널 배분</div>
             {(['online', 'mart', 'direct'] as const).map((key) => (
               <div key={key} className="mb-2">
                 <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="text-gray-500">
+                  <span style={{ color: 'var(--biz-text-muted)' }}>
                     {key === 'online' ? '온라인' : key === 'mart' ? '대형마트' : '직영'}
                   </span>
-                  <span className="font-mono text-gray-900">{decisions.channels[key]}%</span>
+                  <span className="font-mono" style={{ color: 'var(--biz-text)' }}>{decisions.channels[key]}%</span>
                 </div>
                 <input
                   type="range"
@@ -142,41 +142,41 @@ export default function DecisionPage() {
             ))}
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500">
-            예상 총비용: <span className="font-semibold text-gray-900">₩{formatBillion(totalCost)}B</span>
+          <div style={{ background: 'var(--biz-primary-light)', borderColor: 'var(--biz-border)', color: 'var(--biz-text-muted)' }} className="border rounded-lg px-4 py-3 text-sm">
+            예상 총비용: <span className="font-semibold" style={{ color: 'var(--biz-text)' }}>₩{formatBillion(totalCost)}B</span>
           </div>
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">실시간 미리보기</h3>
+        <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-5">
+          <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--biz-text)' }}>실시간 미리보기</h3>
           <div className="grid gap-4 sm:grid-cols-2 mb-5">
-            <div className="rounded-lg bg-gray-50 border border-gray-200 p-4">
-              <div className="text-xs text-gray-500 mb-2">시장점유율 예측</div>
-              <div className="text-4xl font-[Manrope] font-bold text-gray-900">{preview.marketShare}%</div>
+            <div style={{ background: 'var(--biz-primary-light)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4">
+              <div className="text-xs mb-2" style={{ color: 'var(--biz-text-muted)' }}>시장점유율 예측</div>
+              <div className="text-4xl font-[Manrope] font-bold" style={{ color: 'var(--biz-primary)' }}>{preview.marketShare}%</div>
             </div>
-            <div className="rounded-lg bg-gray-50 border border-gray-200 p-4">
-              <div className="text-xs text-gray-500 mb-2">분기 예상 매출</div>
-              <div className="text-3xl font-[Manrope] font-bold text-gray-900">₩{formatBillion(preview.revenue)}B</div>
+            <div style={{ background: 'var(--biz-primary-light)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4">
+              <div className="text-xs mb-2" style={{ color: 'var(--biz-text-muted)' }}>분기 예상 매출</div>
+              <div className="text-3xl font-[Manrope] font-bold" style={{ color: 'var(--biz-primary)' }}>₩{formatBillion(preview.revenue)}B</div>
             </div>
           </div>
 
-          <div className="rounded-lg bg-gray-50 border border-gray-200 p-4">
-            <div className="text-xs text-gray-500 mb-3">경쟁사 비교 (B 단위 매출)</div>
+          <div style={{ background: 'var(--biz-primary-light)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4">
+            <div className="text-xs mb-3" style={{ color: 'var(--biz-text-muted)' }}>경쟁사 비교 (B 단위 매출)</div>
             <div className="space-y-3">
               {competitorData.map((company) => {
                 const pct = (company.revenueB / maxRevenueB) * 100;
                 return (
                   <div key={company.name}>
                     <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className={company.name === '우리회사' ? 'text-gray-900 font-semibold' : 'text-gray-500'}>
+                      <span style={{ color: company.name === '우리회사' ? 'var(--biz-text)' : 'var(--biz-text-muted)', fontWeight: company.name === '우리회사' ? 'bold' : 'normal' }}>
                         {company.name}
                       </span>
-                      <span className="font-mono text-gray-900">{company.revenueB.toFixed(1)}B</span>
+                      <span className="font-mono" style={{ color: 'var(--biz-text)' }}>{company.revenueB.toFixed(1)}B</span>
                     </div>
-                    <div className="h-2 rounded-full bg-gray-100">
+                    <div style={{ background: '#e2e8f0' }} className="h-2 rounded-full">
                       <div
-                        className={`h-2 rounded-full ${company.name === '우리회사' ? 'bg-gray-900' : 'bg-gray-300'}`}
-                        style={{ width: `${pct}%` }}
+                        style={{ background: company.name === '우리회사' ? 'var(--biz-primary)' : '#cbd5e1', width: `${pct}%` }}
+                        className="h-2 rounded-full"
                       />
                     </div>
                   </div>
@@ -189,7 +189,8 @@ export default function DecisionPage() {
 
       <button
         onClick={() => router.push('/play/interview')}
-        className="w-full bg-gray-900 text-white px-6 py-3 rounded-lg text-sm font-bold hover:brightness-110  transition-colors"
+        style={{ background: 'var(--biz-primary)' }}
+        className="w-full text-white px-6 py-3 rounded-lg text-sm font-bold hover:opacity-90 transition-all"
       >
         시뮬레이션 실행
       </button>

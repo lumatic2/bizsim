@@ -16,16 +16,18 @@ export function DecisionSlider({ label, value, min, max, step, unit, formatValue
   const percent = ((value - min) / (max - min)) * 100;
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 bg-white">
-      <div className="text-xs text-gray-500 mb-1">{label}</div>
-      <div className="text-xl font-[Manrope] font-bold text-gray-900">
-        {display} <span className="text-sm font-normal text-gray-500">{unit}</span>
+    <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4">
+      <div className="text-xs mb-1" style={{ color: 'var(--biz-text-muted)' }}>
+        {label}
+      </div>
+      <div className="text-xl font-[Manrope] font-bold" style={{ color: 'var(--biz-text)' }}>
+        {display} <span className="text-sm font-normal" style={{ color: 'var(--biz-text-muted)' }}>{unit}</span>
       </div>
       <div className="relative mt-3">
-        <div className="h-1 bg-gray-100 rounded-full">
+        <div style={{ background: '#e2e8f0' }} className="h-1 rounded-full">
           <div
-            className="h-1 bg-gray-900 rounded-full"
-            style={{ width: `${percent}%` }}
+            style={{ background: 'var(--biz-primary)', width: `${percent}%` }}
+            className="h-1 rounded-full"
           />
         </div>
         <input

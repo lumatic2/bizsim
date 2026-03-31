@@ -64,34 +64,42 @@ export default function FinancialsPage() {
   const tableRows = tab === 'pnl' ? pnlRows : tab === 'bs' ? bsRows : cfRows;
 
   return (
-    <div>
+    <div className="max-w-5xl mx-auto">
+      <h1 className="text-2xl font-[Manrope] font-bold mb-2" style={{ color: 'var(--biz-text)' }}>
+        재무제표
+      </h1>
+      <p style={{ color: 'var(--biz-text-muted)' }} className="text-sm mb-6">
+        1분기 경영 성과를 재무제표로 분석하세요.
+      </p>
+
       <div className="flex gap-2 mb-4">
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
+            style={
               tab === t.id
-                ? 'bg-gray-900 border-gray-900 text-white font-semibold'
-                : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
-            }`}
+                ? { background: 'var(--biz-primary)', borderColor: 'var(--biz-primary)', color: 'white' }
+                : { background: 'var(--biz-card)', borderColor: 'var(--biz-border)', color: 'var(--biz-text-muted)' }
+            }
+            className="px-4 py-2 text-sm rounded-lg border transition-colors font-semibold"
           >
             {t.label}
           </button>
         ))}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4">
         <FinancialTable rows={tableRows} />
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-4 mt-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-2">인사이트</h3>
-        <div className="space-y-1 text-sm text-gray-500">
-          <p className="pl-3 border-l-2 border-gray-900">
+      <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 mt-4">
+        <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--biz-text)' }}>인사이트</h3>
+        <div className="space-y-1 text-sm" style={{ color: 'var(--biz-text-muted)' }}>
+          <p style={{ borderLeftColor: 'var(--biz-primary)' }} className="pl-3 border-l-2">
             매출총이익률: {pnl.revenue > 0 ? ((pnl.grossProfit / pnl.revenue) * 100).toFixed(1) : 0}%
           </p>
-          <p className="pl-3 border-l-2 border-gray-900">
+          <p style={{ borderLeftColor: 'var(--biz-primary)' }} className="pl-3 border-l-2">
             {pnl.operatingProfit > 0
               ? `영업이익 ₩${(pnl.operatingProfit / 1_000_000).toFixed(0)}M 달성`
               : `영업손실 ₩${(Math.abs(pnl.operatingProfit) / 1_000_000).toFixed(0)}M — 비용 구조 재검토 필요`}
@@ -99,16 +107,18 @@ export default function FinancialsPage() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-gray-200/20 pt-4 mt-4">
+      <div style={{ borderTopColor: 'var(--biz-border)' }} className="flex items-center justify-between border-t pt-4 mt-4">
         <button
           onClick={() => router.push('/play/results')}
-          className="border border-gray-200 text-gray-500 px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
+          style={{ borderColor: 'var(--biz-border)', color: 'var(--biz-text-muted)' }}
+          className="border px-4 py-2 rounded-lg text-sm hover:opacity-75 transition-opacity"
         >
           ← 결과 대시보드
         </button>
         <button
           onClick={() => router.push('/play')}
-          className="bg-gray-900 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:brightness-110"
+          style={{ background: 'var(--biz-primary)' }}
+          className="text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-all"
         >
           다음 라운드 →
         </button>

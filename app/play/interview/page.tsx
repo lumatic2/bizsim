@@ -75,15 +75,18 @@ export default function InterviewPage() {
 
   const dna = dnaByPersona[selectedPersona];
 
-  const badgeClass = (value: 'HIGH' | 'MODERATE' | 'LOW') => {
-    if (value === 'HIGH') return 'bg-amber-500/20 text-amber-300 border-amber-500/40';
-    if (value === 'MODERATE') return 'bg-gray-900/20 text-gray-900 border-gray-900/40';
-    return 'bg-gray-100 text-gray-600 border-gray-200';
+  const badgeStyle = (value: 'HIGH' | 'MODERATE' | 'LOW') => {
+    if (value === 'HIGH') return { background: 'var(--biz-warning-bg)', color: 'var(--biz-warning)', borderColor: 'var(--biz-warning)' };
+    if (value === 'MODERATE') return { background: 'var(--biz-primary-light)', color: 'var(--biz-primary)', borderColor: 'var(--biz-primary)' };
+    return { background: 'var(--biz-border)', color: 'var(--biz-text-muted)', borderColor: 'var(--biz-border)' };
   };
 
   return (
-    <div className="space-y-4">
-      <div className="text-xs text-gray-500">
+    <div className="space-y-4 max-w-5xl mx-auto">
+      <h1 className="text-2xl font-[Manrope] font-bold" style={{ color: 'var(--biz-text)' }}>
+        소비자 인터뷰
+      </h1>
+      <div className="text-xs" style={{ color: 'var(--biz-text-muted)' }}>
         소비자에게 직접 물어보세요. 제품 반응, 가격 민감도, 구매 의향을 대화로 파악할 수 있습니다.
       </div>
 
@@ -94,26 +97,26 @@ export default function InterviewPage() {
             <button
               key={p.id}
               onClick={() => setSelectedPersona(p.id)}
-              className={`w-full text-left border rounded-lg p-3 transition-colors bg-white ${
-                selectedPersona === p.id
-                  ? 'border-gray-900'
-                  : 'border-gray-200 hover:border-gray-400'
-              }`}
+              style={{
+                background: selectedPersona === p.id ? 'var(--biz-primary-light)' : 'var(--biz-card)',
+                borderColor: selectedPersona === p.id ? 'var(--biz-primary)' : 'var(--biz-border)',
+              }}
+              className="w-full text-left border rounded-lg p-3 transition-colors"
             >
               <div className="text-lg mb-1">{p.emoji}</div>
-              <div className="text-sm font-semibold text-gray-900">{p.name} ({p.age})</div>
-              <div className="text-xs text-gray-500 mt-0.5">{p.description}</div>
-              <div className="mt-2 inline-flex rounded-full border border-gray-200 px-2 py-0.5 text-[11px] text-gray-500">
+              <div className="text-sm font-semibold" style={{ color: 'var(--biz-text)' }}>{p.name} ({p.age})</div>
+              <div className="text-xs mt-0.5" style={{ color: 'var(--biz-text-muted)' }}>{p.description}</div>
+              <div className="mt-2 inline-flex rounded-full border px-2 py-0.5 text-[11px]" style={{ borderColor: 'var(--biz-border)', color: 'var(--biz-text-muted)' }}>
                 {Math.floor(chatHistories[p.id].length / 2)}회 대화
               </div>
             </button>
           ))}
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="mb-3 flex items-center justify-between border-b border-gray-200/20 pb-3">
-            <div className="text-sm font-semibold text-gray-900">{persona.name}</div>
-            <span className="rounded-full border border-gray-900/40 bg-gray-900/20 px-2 py-0.5 text-[11px] font-semibold text-gray-900">
+        <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4">
+          <div style={{ borderBottomColor: 'var(--biz-border)' }} className="mb-3 flex items-center justify-between pb-3 border-b">
+            <div className="text-sm font-semibold" style={{ color: 'var(--biz-text)' }}>{persona.name}</div>
+            <span style={{ background: 'var(--biz-success-bg)', color: 'var(--biz-success)', borderColor: 'var(--biz-success)' }} className="rounded-full border px-2 py-0.5 text-[11px] font-semibold">
               ONLINE
             </span>
           </div>
@@ -127,42 +130,44 @@ export default function InterviewPage() {
           />
         </div>
 
-        <aside className="rounded-xl border border-gray-200 bg-gray-50 p-3">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Persona DNA</h3>
-          <div className="mb-3 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-500">
-            세그먼트: <span className="font-semibold text-gray-900">{dna.segment}</span>
+        <aside style={{ background: 'var(--biz-primary-light)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-3">
+          <h3 className="text-xs font-semibold uppercase mb-3" style={{ color: 'var(--biz-text-muted)' }}>Persona DNA</h3>
+          <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)', color: 'var(--biz-text-muted)' }} className="mb-3 rounded-lg border px-2 py-1.5 text-xs">
+            세그먼트: <span className="font-semibold" style={{ color: 'var(--biz-text)' }}>{dna.segment}</span>
           </div>
           <div className="space-y-2 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">가격민감도</span>
-              <span className={`rounded-full border px-2 py-0.5 ${badgeClass(dna.price)}`}>{dna.price}</span>
+              <span style={{ color: 'var(--biz-text-muted)' }}>가격민감도</span>
+              <span style={badgeStyle(dna.price)} className="rounded-full border px-2 py-0.5">{dna.price}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">브랜드충성도</span>
-              <span className={`rounded-full border px-2 py-0.5 ${badgeClass(dna.brand)}`}>{dna.brand}</span>
+              <span style={{ color: 'var(--biz-text-muted)' }}>브랜드충성도</span>
+              <span style={badgeStyle(dna.brand)} className="rounded-full border px-2 py-0.5">{dna.brand}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">혁신수용도</span>
-              <span className={`rounded-full border px-2 py-0.5 ${badgeClass(dna.innovation)}`}>{dna.innovation}</span>
+              <span style={{ color: 'var(--biz-text-muted)' }}>혁신수용도</span>
+              <span style={badgeStyle(dna.innovation)} className="rounded-full border px-2 py-0.5">{dna.innovation}</span>
             </div>
           </div>
         </aside>
       </div>
 
-      <div className="flex items-center justify-between border-t border-gray-200/20 pt-4 mt-4">
-        <span className="text-xs text-gray-500">
+      <div style={{ borderTopColor: 'var(--biz-border)' }} className="flex items-center justify-between border-t pt-4 mt-4">
+        <span className="text-xs" style={{ color: 'var(--biz-text-muted)' }}>
           인터뷰 완료 후 시뮬레이션을 실행하세요
         </span>
         <div className="flex gap-2">
           <button
             onClick={() => router.push('/play')}
-            className="border border-gray-200 text-gray-500 px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
+            style={{ borderColor: 'var(--biz-border)', color: 'var(--biz-text-muted)' }}
+            className="border px-4 py-2 rounded-lg text-sm hover:opacity-75 transition-opacity"
           >
             ← 의사결정 수정
           </button>
           <button
             onClick={handleRunSimulation}
-            className="bg-gray-900 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:brightness-110 "
+            style={{ background: 'var(--biz-primary)' }}
+            className="text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:opacity-90 transition-all"
           >
             시뮬레이션 실행 →
           </button>
