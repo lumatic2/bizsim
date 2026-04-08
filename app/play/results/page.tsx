@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/stores/game-store';
 import { MetricCard } from '@/components/MetricCard';
@@ -19,8 +19,13 @@ export default function ResultsPage() {
   const { results, decisions, currentRound } = useGameStore();
   const [competitorTab, setCompetitorTab] = useState<'market' | 'ads' | 'channels'>('market');
 
+  useEffect(() => {
+    if (!results) {
+      router.push('/play');
+    }
+  }, [results, router]);
+
   if (!results) {
-    router.push('/play');
     return null;
   }
 

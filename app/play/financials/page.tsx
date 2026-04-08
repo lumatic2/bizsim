@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/stores/game-store';
 import { FinancialTable } from '@/components/FinancialTable';
@@ -12,8 +12,13 @@ export default function FinancialsPage() {
   const { financials, results, currentRound, maxRounds, advanceRound, gameOver } = useGameStore();
   const [tab, setTab] = useState<Tab>('pnl');
 
+  useEffect(() => {
+    if (!financials || !results) {
+      router.push('/play');
+    }
+  }, [financials, results, router]);
+
   if (!financials || !results) {
-    router.push('/play');
     return null;
   }
 
@@ -133,5 +138,4 @@ export default function FinancialsPage() {
     </div>
   );
 }
-
 
