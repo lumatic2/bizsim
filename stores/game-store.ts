@@ -23,6 +23,8 @@ type GameActions = {
   setSelectedPersona: (id: PersonaId) => void;
   addMessage: (personaId: PersonaId, message: ChatMessage) => void;
   appendToLastAssistant: (personaId: PersonaId, chunk: string) => void;
+  setRoundDebrief: (round: number, text: string) => void;
+  setFinalDebrief: (text: string) => void;
   advanceRound: () => void;
   resetGame: () => void;
 };
@@ -42,6 +44,8 @@ const initialState: GameState = {
   qualityCap: 3,
   previousBS: null,
   gameOver: false,
+  roundDebriefs: {},
+  finalDebrief: null,
 };
 
 export const useGameStore = create<GameState & GameActions>()(
@@ -77,6 +81,11 @@ export const useGameStore = create<GameState & GameActions>()(
       }
       return { chatHistories: { ...s.chatHistories, [personaId]: history } };
     }),
+
+  setRoundDebrief: (round, text) =>
+    set((s) => ({ roundDebriefs: { ...s.roundDebriefs, [round]: text } })),
+
+  setFinalDebrief: (text) => set({ finalDebrief: text }),
 
   advanceRound: () => set((s) => {
     if (!s.results || !s.financials) return s;
@@ -144,6 +153,8 @@ export const useGameStore = create<GameState & GameActions>()(
         qualityCap: state.qualityCap,
         previousBS: state.previousBS,
         gameOver: state.gameOver,
+        roundDebriefs: state.roundDebriefs,
+        finalDebrief: state.finalDebrief,
       }),
     },
   ),

@@ -3,28 +3,42 @@
 import { useEffect, useRef, useState } from 'react';
 import { SERVER_ERROR_MESSAGE } from '@/lib/errors';
 
-type Props =
-  | {
-      mode: 'round';
-      round: number;
-      payload: unknown;
-    }
-  | {
-      mode: 'final';
-      payload: unknown;
-    };
+type CommonProps = {
+  cachedText?: string;
+  onComplete?: (text: string) => void;
+};
+
+type Props = CommonProps &
+  (
+    | {
+        mode: 'round';
+        round: number;
+        payload: unknown;
+      }
+    | {
+        mode: 'final';
+        payload: unknown;
+      }
+  );
 
 export function AIDebrief(props: Props) {
-  const [text, setText] = useState('');
-  const [status, setStatus] = useState<'loading' | 'streaming' | 'done' | 'error'>('loading');
+  const hasCache = Boolean(props.cachedText);
+  const [text, setText] = useState(props.cachedText ?? '');
+  const [status, setStatus] = useState<'loading' | 'streaming' | 'done' | 'error'>(
+    hasCache ? 'done' : 'loading',
+  );
   const [error, setError] = useState<string | null>(null);
   const startedRef = useRef(false);
+  const onCompleteRef = useRef(props.onComplete);
+  onCompleteRef.current = props.onComplete;
 
   useEffect(() => {
+    if (hasCache) return;
     if (startedRef.current) return;
     startedRef.current = true;
 
     const controller = new AbortController();
+    let collected = '';
 
     (async () => {
       try {
@@ -47,9 +61,14 @@ export function AIDebrief(props: Props) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          setText((prev) => prev + decoder.decode(value, { stream: true }));
+          const chunk = decoder.decode(value, { stream: true });
+          collected += chunk;
+          setText((prev) => prev + chunk);
         }
         setStatus('done');
+        if (collected.trim()) {
+          onCompleteRef.current?.(collected.trim());
+        }
       } catch (e) {
         if ((e as Error).name === 'AbortError') return;
         setError(SERVER_ERROR_MESSAGE);
@@ -58,7 +77,7 @@ export function AIDebrief(props: Props) {
     })();
 
     return () => controller.abort();
-  }, []);
+  }, [hasCache]);
 
   return (
     <div
@@ -72,7 +91,7 @@ export function AIDebrief(props: Props) {
         <span className="text-xs font-mono" style={{ color: 'var(--biz-text-muted)' }}>
           {status === 'loading' && '생성 준비 중…'}
           {status === 'streaming' && '작성 중…'}
-          {status === 'done' && '완료'}
+          {status === 'done' && (hasCache ? '저장됨' : '완료')}
           {status === 'error' && '오류'}
         </span>
       </div>

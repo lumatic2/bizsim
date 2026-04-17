@@ -17,7 +17,7 @@ function formatKRW(value: number): string {
 
 export default function ResultsPage() {
   const router = useRouter();
-  const { results, decisions, currentRound, roundHistory } = useGameStore();
+  const { results, decisions, currentRound, roundHistory, roundDebriefs, setRoundDebrief } = useGameStore();
   const [competitorTab, setCompetitorTab] = useState<'market' | 'ads' | 'channels'>('market');
 
   const previousResults = useMemo(() => {
@@ -112,6 +112,8 @@ export default function ResultsPage() {
           mode="round"
           round={currentRound}
           payload={debriefPayload}
+          cachedText={roundDebriefs[currentRound]}
+          onComplete={(text) => setRoundDebrief(currentRound, text)}
         />
       )}
 

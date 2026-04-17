@@ -1,16 +1,30 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/stores/game-store';
 import { FinancialTable } from '@/components/FinancialTable';
+import { AIDebrief } from '@/components/AIDebrief';
 
 type Tab = 'pnl' | 'bs' | 'cf';
 
 export default function FinancialsPage() {
   const router = useRouter();
-  const { financials, results, currentRound, maxRounds, advanceRound, gameOver } = useGameStore();
+  const { financials, results, decisions, currentRound, maxRounds, advanceRound, gameOver, roundHistory, roundDebriefs, setRoundDebrief } = useGameStore();
   const [tab, setTab] = useState<Tab>('pnl');
+
+  const previousResults = useMemo(() => {
+    const prev = roundHistory[roundHistory.length - 1];
+    return prev ? prev.results : null;
+  }, [roundHistory]);
+
+  const debriefPayload = useMemo(
+    () =>
+      results
+        ? { mode: 'round' as const, round: currentRound, decisions, results, previousResults }
+        : null,
+    [results, currentRound, decisions, previousResults],
+  );
 
   useEffect(() => {
     if (!financials || !results) {
@@ -98,19 +112,34 @@ export default function FinancialsPage() {
         <FinancialTable rows={tableRows} />
       </div>
 
-      <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 mt-4">
-        <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--biz-text)' }}>인사이트</h3>
-        <div className="space-y-1 text-sm" style={{ color: 'var(--biz-text-muted)' }}>
-          <p style={{ borderLeftColor: 'var(--biz-primary)' }} className="pl-3 border-l-2">
-            매출총이익률: {pnl.revenue > 0 ? ((pnl.grossProfit / pnl.revenue) * 100).toFixed(1) : 0}%
-          </p>
-          <p style={{ borderLeftColor: 'var(--biz-primary)' }} className="pl-3 border-l-2">
+      <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 mt-4 text-sm" >
+        <div className="flex items-center gap-3" style={{ color: 'var(--biz-text-muted)' }}>
+          <span>
+            매출총이익률 <span style={{ color: 'var(--biz-text)' }} className="font-semibold">
+              {pnl.revenue > 0 ? ((pnl.grossProfit / pnl.revenue) * 100).toFixed(1) : 0}%
+            </span>
+          </span>
+          <span style={{ color: 'var(--biz-border)' }}>·</span>
+          <span>
             {pnl.operatingProfit > 0
-              ? `영업이익 ₩${(pnl.operatingProfit / 1_000_000).toFixed(0)}M 달성`
-              : `영업손실 ₩${(Math.abs(pnl.operatingProfit) / 1_000_000).toFixed(0)}M — 비용 구조 재검토 필요`}
-          </p>
+              ? <>영업이익 <span style={{ color: 'var(--biz-success, #15803d)' }} className="font-semibold">₩{(pnl.operatingProfit / 1_000_000).toFixed(0)}M</span> 달성</>
+              : <>영업손실 <span style={{ color: '#dc2626' }} className="font-semibold">₩{(Math.abs(pnl.operatingProfit) / 1_000_000).toFixed(0)}M</span> — 비용 구조 재검토 필요</>}
+          </span>
         </div>
       </div>
+
+      {debriefPayload && (
+        <div className="mt-4">
+          <AIDebrief
+            key={`fin-round-${currentRound}`}
+            mode="round"
+            round={currentRound}
+            payload={debriefPayload}
+            cachedText={roundDebriefs[currentRound]}
+            onComplete={(text) => setRoundDebrief(currentRound, text)}
+          />
+        </div>
+      )}
 
       <div style={{ borderTopColor: 'var(--biz-border)' }} className="flex items-center justify-between border-t pt-4 mt-4">
         <button

@@ -34,6 +34,8 @@ PRD v2.0까지 핵심 기능 구현됨:
 - [x] **인터뷰도 로컬 AI로** — `/api/chat` Gemini → Ollama gemma4-ko:26b-q8
 - [x] **미사용 SDK 제거** — `@google/genai`, `@anthropic-ai/sdk` uninstall
 - [x] **서버 다운 시 통일된 에러 메시지** — `서버 연결 실패. "yusung@askewly.com"으로 문의` 로 통일 (`lib/errors.ts`)
+- [x] **재무제표 페이지에도 디브리프 노출** — store에 `roundDebriefs`/`finalDebrief` 캐시. 결과↔재무제표 이동 시 재호출 없음
+- [x] **게임 종료 차트 폴리싱** — 축 라벨·단위·0 기준선·data point 도트·tooltip 포맷 추가
 - [ ] **배포용 LAN/tunnel 문서화** — Tailscale·Cloudflare Tunnel 설정 가이드
 
 ## PRD 보류 항목 (장기)
@@ -49,6 +51,7 @@ PRD v2.0까지 핵심 기능 구현됨:
 
 ## 진행 로그
 
+- 2026-04-17 디브리프 라운드별/최종 캐싱(store에 저장, 재호출 없음), 재무제표 페이지에도 디브리프 노출, /play/end 차트 축 라벨·tooltip 폴리싱
 - 2026-04-17 미사용 SDK 제거, 서버 에러 메시지 통일(`lib/errors.ts`), 디브리프 프롬프트에 판단 원칙 + 상황 태그 주입
 - 2026-04-17 인터뷰 경로도 로컬 Ollama로 전환 → 외부 API 의존 0
 - 2026-04-17 디브리프 모델 `gemma4-ko:26b-q8`로 업그레이드, localStorage 게임 상태 저장/복원 (Zustand persist)

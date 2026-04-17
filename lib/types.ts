@@ -120,4 +120,6 @@ export type GameState = {
   qualityCap: number;
   previousBS: CarryForwardBS | null;
   gameOver: boolean;
+  roundDebriefs: Record<number, string>;
+  finalDebrief: string | null;
 };

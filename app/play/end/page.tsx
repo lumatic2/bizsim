@@ -10,6 +10,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -25,7 +26,7 @@ function formatKRW(value: number): string {
 
 export default function GameEndPage() {
   const router = useRouter();
-  const { roundHistory, resetGame } = useGameStore();
+  const { roundHistory, resetGame, finalDebrief, setFinalDebrief } = useGameStore();
 
   useEffect(() => {
     if (roundHistory.length === 0) {
@@ -43,8 +44,8 @@ export default function GameEndPage() {
     const chartData = roundHistory.map((r) => ({
       round: `R${r.round}`,
       점유율: r.results.marketShare,
-      매출B: Number((r.results.revenue / 1_000_000_000).toFixed(2)),
-      영업이익B: Number((r.results.operatingProfit / 1_000_000_000).toFixed(2)),
+      '매출 (₩B)': Number((r.results.revenue / 1_000_000_000).toFixed(2)),
+      '영업이익 (₩B)': Number((r.results.operatingProfit / 1_000_000_000).toFixed(2)),
     }));
     return { totalRevenue, totalProfit, avgShare, finalShare, chartData };
   }, [roundHistory]);
@@ -116,30 +117,45 @@ export default function GameEndPage() {
         />
       </div>
 
-      <AIDebrief key="final" mode="final" payload={finalPayload} />
+      <AIDebrief
+        key="final"
+        mode="final"
+        payload={finalPayload}
+        cachedText={finalDebrief ?? undefined}
+        onComplete={(text) => setFinalDebrief(text)}
+      />
 
       <div
         style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }}
         className="border rounded-lg p-4 mb-6"
       >
         <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--biz-text)' }}>
-          분기별 매출·영업이익 추이 (₩B)
+          분기별 매출·영업이익 추이
         </h3>
-        <ResponsiveContainer width="100%" height={260}>
-          <LineChart data={chartData} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={chartData} margin={{ top: 10, right: 24, bottom: 10, left: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--biz-border)" />
-            <XAxis dataKey="round" style={{ fontSize: '12px', fill: 'var(--biz-text-muted)' }} />
-            <YAxis style={{ fontSize: '12px', fill: 'var(--biz-text-muted)' }} />
+            <XAxis
+              dataKey="round"
+              style={{ fontSize: '12px', fill: 'var(--biz-text-muted)' }}
+              label={{ value: '분기', position: 'insideBottom', offset: -4, style: { fontSize: 11, fill: 'var(--biz-text-muted)' } }}
+            />
+            <YAxis
+              style={{ fontSize: '12px', fill: 'var(--biz-text-muted)' }}
+              label={{ value: '₩ 십억', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: 'var(--biz-text-muted)', textAnchor: 'middle' } }}
+            />
             <Tooltip
               contentStyle={{
                 background: 'var(--biz-card)',
                 border: '1px solid var(--biz-border)',
                 borderRadius: '6px',
               }}
+              formatter={(value: number) => [`₩${value.toFixed(2)}B`, '']}
             />
-            <Legend />
-            <Line type="monotone" dataKey="매출B" stroke="#2563eb" strokeWidth={2} />
-            <Line type="monotone" dataKey="영업이익B" stroke="#15803d" strokeWidth={2} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <ReferenceLine y={0} stroke="var(--biz-border)" strokeDasharray="3 3" />
+            <Line type="monotone" dataKey="매출 (₩B)" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} />
+            <Line type="monotone" dataKey="영업이익 (₩B)" stroke="#15803d" strokeWidth={2} dot={{ r: 3 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -149,21 +165,31 @@ export default function GameEndPage() {
         className="border rounded-lg p-4 mb-6"
       >
         <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--biz-text)' }}>
-          분기별 시장점유율 (%)
+          분기별 시장점유율
         </h3>
-        <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={chartData} margin={{ top: 10, right: 20, bottom: 10, left: 0 }}>
+        <ResponsiveContainer width="100%" height={240}>
+          <LineChart data={chartData} margin={{ top: 10, right: 24, bottom: 10, left: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--biz-border)" />
-            <XAxis dataKey="round" style={{ fontSize: '12px', fill: 'var(--biz-text-muted)' }} />
-            <YAxis style={{ fontSize: '12px', fill: 'var(--biz-text-muted)' }} />
+            <XAxis
+              dataKey="round"
+              style={{ fontSize: '12px', fill: 'var(--biz-text-muted)' }}
+              label={{ value: '분기', position: 'insideBottom', offset: -4, style: { fontSize: 11, fill: 'var(--biz-text-muted)' } }}
+            />
+            <YAxis
+              domain={[0, 'auto']}
+              style={{ fontSize: '12px', fill: 'var(--biz-text-muted)' }}
+              unit="%"
+              label={{ value: '시장점유율 (%)', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: 'var(--biz-text-muted)', textAnchor: 'middle' } }}
+            />
             <Tooltip
               contentStyle={{
                 background: 'var(--biz-card)',
                 border: '1px solid var(--biz-border)',
                 borderRadius: '6px',
               }}
+              formatter={(value: number) => [`${value.toFixed(1)}%`, '시장점유율']}
             />
-            <Line type="monotone" dataKey="점유율" stroke="#9333ea" strokeWidth={2} />
+            <Line type="monotone" dataKey="점유율" stroke="#9333ea" strokeWidth={2} dot={{ r: 3 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
