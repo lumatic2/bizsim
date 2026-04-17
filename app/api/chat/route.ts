@@ -1,61 +1,98 @@
-import { GoogleGenAI } from '@google/genai';
 import { getPersona, buildSystemPrompt } from '@/lib/personas';
 import type { PersonaId, Decisions, ChatMessage } from '@/lib/types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+const OLLAMA_HOST = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'gemma4-ko:26b-q8';
 
 export async function POST(req: Request) {
+  let body: { messages: ChatMessage[]; personaId: PersonaId; decisions: Decisions };
   try {
-    const body = await req.json();
-    const { messages, personaId, decisions } = body as {
-      messages: ChatMessage[];
-      personaId: PersonaId;
-      decisions: Decisions;
-    };
+    body = await req.json();
+  } catch {
+    return new Response('잘못된 요청 본문입니다.', { status: 400 });
+  }
 
-    if (!messages || messages.length === 0) {
-      return new Response('메시지가 비어있습니다.', { status: 400 });
-    }
+  const { messages, personaId, decisions } = body;
 
-    const persona = getPersona(personaId);
-    if (!persona) {
-      return new Response('잘못된 페르소나입니다.', { status: 400 });
-    }
+  if (!messages || messages.length === 0) {
+    return new Response('메시지가 비어있습니다.', { status: 400 });
+  }
 
-    const systemPrompt = buildSystemPrompt(persona, decisions);
+  const persona = getPersona(personaId);
+  if (!persona) {
+    return new Response('잘못된 페르소나입니다.', { status: 400 });
+  }
 
-    const contents = messages.map((m) => ({
-      role: m.role === 'assistant' ? 'model' : ('user' as 'user' | 'model'),
-      parts: [{ text: m.content }],
-    }));
+  const systemPrompt = buildSystemPrompt(persona, decisions);
 
-    const response = await ai.models.generateContentStream({
-      model: 'gemini-2.5-flash',
-      config: {
-        systemInstruction: systemPrompt,
-        maxOutputTokens: 300,
-      },
-      contents,
+  const ollamaMessages = [
+    { role: 'system', content: systemPrompt },
+    ...messages.map((m) => ({ role: m.role, content: m.content })),
+  ];
+
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${OLLAMA_HOST}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        messages: ollamaMessages,
+        stream: true,
+        think: false,
+        options: { temperature: 0.7, num_predict: 300 },
+      }),
     });
+  } catch {
+    return new Response(
+      `로컬 AI(${OLLAMA_HOST})에 연결할 수 없습니다. Ollama가 실행 중인지 확인하세요.`,
+      { status: 503 },
+    );
+  }
 
-    const readable = new ReadableStream({
-      async start(controller) {
-        const encoder = new TextEncoder();
-        for await (const chunk of response) {
-          const text = chunk.text ?? '';
-          if (text) {
-            controller.enqueue(encoder.encode(text));
+  if (!upstream.ok || !upstream.body) {
+    return new Response(`로컬 AI 오류 (${upstream.status})`, { status: 502 });
+  }
+
+  const readable = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      const decoder = new TextDecoder();
+      const reader = upstream.body!.getReader();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const json = JSON.parse(line);
+              const chunk = json?.message?.content;
+              if (typeof chunk === 'string' && chunk) {
+                controller.enqueue(encoder.encode(chunk));
+              }
+              if (json.done) {
+                controller.close();
+                return;
+              }
+            } catch {
+              // Malformed line — skip
+            }
           }
         }
         controller.close();
-      },
-    });
+      } catch (err) {
+        controller.error(err);
+      }
+    },
+  });
 
-    return new Response(readable, {
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-    });
-  } catch (error) {
-    console.error('Chat API error:', error);
-    return new Response('API 오류가 발생했습니다.', { status: 500 });
-  }
+  return new Response(readable, {
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+  });
 }

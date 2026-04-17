@@ -31,7 +31,9 @@ PRD v2.0까지 핵심 기능 구현됨:
 - [x] **AI 디브리프** — 라운드별 + 게임 종료 총평. 로컬 Ollama(`qwen3:14b`) 기반, 스트리밍
 - [x] **저장/복원** — Zustand persist 미들웨어, localStorage에 게임 상태 지속. `/play` 레이아웃에서 skipHydration + 수동 rehydrate로 SSR 미스매치 회피. 결정 페이지에 "게임 초기화" 버튼
 - [ ] **라운드별 디브리프 품질 튜닝** — 모델은 `gemma4-ko:26b-q8`로 업그레이드. 추가로 프롬프트에 경영 원칙 주입 고려
-- [ ] **Gemini Flash 폴백 검증** — 인터뷰 경로(`/api/chat`) 실사용 확인
+- [x] **인터뷰도 로컬 AI로** — `/api/chat` Gemini → Ollama gemma4-ko:26b-q8 전환. 외부 API 의존 제거
+- [ ] **package.json `@google/genai` 제거** — 미사용 의존성 정리
+- [ ] **배포용 LAN/tunnel 문서화** — Tailscale·Cloudflare Tunnel 설정 가이드
 - [ ] **Ollama 다운 시 우아한 폴백** — 현재 503 에러 배너만. 규칙 기반 텍스트로라도 대체 표시
 
 ## PRD 보류 항목 (장기)
@@ -47,6 +49,7 @@ PRD v2.0까지 핵심 기능 구현됨:
 
 ## 진행 로그
 
+- 2026-04-17 인터뷰 경로도 로컬 Ollama로 전환 → 외부 API 의존 0
 - 2026-04-17 디브리프 모델 `gemma4-ko:26b-q8`로 업그레이드, localStorage 게임 상태 저장/복원 (Zustand persist)
 - 2026-04-17 게임 종료 화면(`/play/end`) + AI 디브리프 (로컬 Ollama 스트리밍). 결과 페이지의 하드코딩 디브리프도 교체
 - 2026-04-17 큐잉 시뮬을 `/lab/queue`로 격리, 루트 레이아웃 BizSim 복귀, `/` → `/play` 리다이렉트

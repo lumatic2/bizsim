@@ -39,7 +39,8 @@ export default function InterviewPage() {
       });
 
       if (!res.ok) {
-        appendToLastAssistant(selectedPersona, '(API 연결 오류 — Vercel 환경변수에 GEMINI_API_KEY를 설정해주세요)');
+        const errText = await res.text().catch(() => '로컬 AI 호출 실패');
+        appendToLastAssistant(selectedPersona, `(${errText})`);
         setIsLoading(false);
         return;
       }
