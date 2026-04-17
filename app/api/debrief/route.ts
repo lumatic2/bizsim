@@ -1,4 +1,5 @@
 import type { Decisions, SimulationResults, RoundSnapshot } from '@/lib/types';
+import { SERVER_ERROR_MESSAGE } from '@/lib/errors';
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'gemma4-ko:26b-q8';
@@ -39,9 +40,31 @@ function buildRoundPrompt(body: RoundBody): string {
     ? `이전 분기 대비: 점유율 ${(results.marketShare - previousResults.marketShare).toFixed(1)}%p, 영업이익 ${fmtKRW(results.operatingProfit - previousResults.operatingProfit)}`
     : '첫 분기';
 
+  const tags: string[] = [];
+  if (results.operatingProfit < 0) tags.push('영업적자');
+  else if (results.operatingProfit > results.revenue * 0.1) tags.push('영업흑자 양호');
+  if (decisions.production > results.unitsSold * 1.1) tags.push('재고과잉');
+  if (decisions.production < results.unitsSold * 0.95) tags.push('품절/수요초과');
+  if (decisions.price > competitorAvgPrice * 1.05) tags.push('가격 프리미엄');
+  else if (decisions.price < competitorAvgPrice * 0.95) tags.push('저가전략');
+  if (previousResults) {
+    const shareDelta = results.marketShare - previousResults.marketShare;
+    if (shareDelta > 1) tags.push('점유율상승');
+    else if (shareDelta < -1) tags.push('점유율하락');
+  }
+
   return [
     `BizSim 경영 시뮬레이션 ${round}분기 결과를 플레이어에게 2-3문장으로 해설해줘.`,
-    `숫자 해석 1개 + 다음 분기 개선 제안 1개를 꼭 포함할 것. 해설만 한국어로 출력, 서론이나 마무리 인사 없이.`,
+    ``,
+    `[판단 원칙]`,
+    `- 영업적자 상태면 광고·R&D 증액은 제안 금지. 가격·비용·생산량 조정을 우선 검토.`,
+    `- 재고과잉이면 다음 분기 생산 축소 또는 할인 프로모션 제안.`,
+    `- 품절/수요초과면 생산 증대 또는 가격 인상 제안.`,
+    `- 제안은 정확히 하나만 (여러 개 나열 금지).`,
+    `- 구체적인 숫자(%, 금액, 또는 증감폭) 최소 1개를 본문에 인용.`,
+    `- 해설만 한국어로 출력, 서론이나 마무리 인사 없이.`,
+    ``,
+    `[상황 태그] ${tags.length > 0 ? tags.join(' · ') : '특이사항 없음'}`,
     ``,
     `[우리회사 의사결정]`,
     `가격 ${fmtKRW(decisions.price)}, 품질 ${decisions.quality}/5, R&D ${fmtKRW(decisions.rdBudget)}, 광고 ${fmtKRW(decisions.adBudget)}, 생산 ${decisions.production.toLocaleString()}대`,
@@ -67,13 +90,21 @@ function buildFinalPrompt(body: FinalBody): string {
       `R${r.round}: 점유 ${r.results.marketShare}%, 매출 ${fmtKRW(r.results.revenue)}, 영업이익 ${fmtKRW(r.results.operatingProfit)}`,
   );
 
+  const profitableRounds = history.filter((r) => r.results.operatingProfit > 0).length;
+  const peakShare = Math.max(...history.map((r) => r.results.marketShare));
+  const peakRound = history.find((r) => r.results.marketShare === peakShare)?.round;
+
   return [
-    `BizSim 6분기 전체 경영 성과를 플레이어에게 총평해줘. 4-5문장 한국어.`,
-    `다음을 모두 포함: (1) 전반적 평가, (2) 가장 잘한 전략, (3) 아쉬운 점, (4) 실무 인사이트 1개.`,
-    `해설만 출력, 서론이나 마무리 인사 없이.`,
+    `BizSim ${history.length}분기 전체 경영 성과를 플레이어에게 총평해줘. 4-5문장 한국어.`,
+    ``,
+    `[판단 원칙]`,
+    `- 네 가지를 모두 포함: (1) 전반 평가, (2) 가장 잘한 전략, (3) 아쉬운 점, (4) 실무 인사이트 1개.`,
+    `- 일반론("가격 경쟁력 강화" 같은 뻔한 말) 금지. 분기별 실제 숫자에 기반한 구체 분석.`,
+    `- 구체 수치 최소 2개 인용 (예: "R${peakRound}에서 점유율 ${peakShare}% 정점", "6분기 중 ${profitableRounds}분기 흑자").`,
+    `- 해설만 출력, 서론이나 마무리 인사 없이.`,
     ``,
     `[누적 성과]`,
-    `총매출 ${fmtKRW(totalRevenue)} / 총 영업이익 ${fmtKRW(totalProfit)} / 평균 점유율 ${avgShare.toFixed(1)}%`,
+    `총매출 ${fmtKRW(totalRevenue)} / 총 영업이익 ${fmtKRW(totalProfit)} / 평균 점유율 ${avgShare.toFixed(1)}% / 흑자분기 ${profitableRounds}/${history.length} / 최고 점유율 ${peakShare}% (R${peakRound})`,
     ``,
     `[분기별 추이]`,
     ...lines,
@@ -107,14 +138,11 @@ export async function POST(req: Request) {
       }),
     });
   } catch {
-    return new Response(
-      `로컬 AI(${OLLAMA_HOST})에 연결할 수 없습니다. Ollama가 실행 중인지 확인하세요.`,
-      { status: 503 },
-    );
+    return new Response(SERVER_ERROR_MESSAGE, { status: 503 });
   }
 
   if (!upstream.ok || !upstream.body) {
-    return new Response(`로컬 AI 오류 (${upstream.status})`, { status: 502 });
+    return new Response(SERVER_ERROR_MESSAGE, { status: 502 });
   }
 
   const readable = new ReadableStream({

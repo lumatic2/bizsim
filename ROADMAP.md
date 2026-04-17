@@ -30,11 +30,11 @@ PRD v2.0까지 핵심 기능 구현됨:
 - [x] **게임 종료 화면** — `/play/end`에 누적 매출/이익, 점유율 추이 차트, A/B/C/D 등급
 - [x] **AI 디브리프** — 라운드별 + 게임 종료 총평. 로컬 Ollama(`qwen3:14b`) 기반, 스트리밍
 - [x] **저장/복원** — Zustand persist 미들웨어, localStorage에 게임 상태 지속. `/play` 레이아웃에서 skipHydration + 수동 rehydrate로 SSR 미스매치 회피. 결정 페이지에 "게임 초기화" 버튼
-- [ ] **라운드별 디브리프 품질 튜닝** — 모델은 `gemma4-ko:26b-q8`로 업그레이드. 추가로 프롬프트에 경영 원칙 주입 고려
-- [x] **인터뷰도 로컬 AI로** — `/api/chat` Gemini → Ollama gemma4-ko:26b-q8 전환. 외부 API 의존 제거
-- [ ] **package.json `@google/genai` 제거** — 미사용 의존성 정리
+- [x] **라운드별 디브리프 품질 튜닝** — 판단 원칙 주입(적자 시 지출 증액 금지, 제안 1개, 수치 인용 의무), 상황 태그 사전 계산(재고과잉/품절/점유율변화). Before/After 비교 시 수치 인용 2배 증가
+- [x] **인터뷰도 로컬 AI로** — `/api/chat` Gemini → Ollama gemma4-ko:26b-q8
+- [x] **미사용 SDK 제거** — `@google/genai`, `@anthropic-ai/sdk` uninstall
+- [x] **서버 다운 시 통일된 에러 메시지** — `서버 연결 실패. "yusung@askewly.com"으로 문의` 로 통일 (`lib/errors.ts`)
 - [ ] **배포용 LAN/tunnel 문서화** — Tailscale·Cloudflare Tunnel 설정 가이드
-- [ ] **Ollama 다운 시 우아한 폴백** — 현재 503 에러 배너만. 규칙 기반 텍스트로라도 대체 표시
 
 ## PRD 보류 항목 (장기)
 
@@ -49,6 +49,7 @@ PRD v2.0까지 핵심 기능 구현됨:
 
 ## 진행 로그
 
+- 2026-04-17 미사용 SDK 제거, 서버 에러 메시지 통일(`lib/errors.ts`), 디브리프 프롬프트에 판단 원칙 + 상황 태그 주입
 - 2026-04-17 인터뷰 경로도 로컬 Ollama로 전환 → 외부 API 의존 0
 - 2026-04-17 디브리프 모델 `gemma4-ko:26b-q8`로 업그레이드, localStorage 게임 상태 저장/복원 (Zustand persist)
 - 2026-04-17 게임 종료 화면(`/play/end`) + AI 디브리프 (로컬 Ollama 스트리밍). 결과 페이지의 하드코딩 디브리프도 교체

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { SERVER_ERROR_MESSAGE } from '@/lib/errors';
 
 type Props =
   | {
@@ -35,8 +36,7 @@ export function AIDebrief(props: Props) {
         });
 
         if (!res.ok || !res.body) {
-          const msg = await res.text().catch(() => `HTTP ${res.status}`);
-          setError(msg);
+          setError(SERVER_ERROR_MESSAGE);
           setStatus('error');
           return;
         }
@@ -52,7 +52,7 @@ export function AIDebrief(props: Props) {
         setStatus('done');
       } catch (e) {
         if ((e as Error).name === 'AbortError') return;
-        setError((e as Error).message || '알 수 없는 오류');
+        setError(SERVER_ERROR_MESSAGE);
         setStatus('error');
       }
     })();
@@ -81,7 +81,7 @@ export function AIDebrief(props: Props) {
           className="text-xs pl-3 border-l-2"
           style={{ color: 'var(--biz-text-muted)', borderLeftColor: '#dc2626' }}
         >
-          {error ?? '로컬 AI 호출에 실패했습니다.'}
+          {error ?? SERVER_ERROR_MESSAGE}
         </p>
       ) : (
         <p

@@ -8,6 +8,7 @@ import { PERSONAS } from '@/lib/personas';
 import { runSimulation } from '@/lib/game-engine';
 import { generateFinancials } from '@/lib/financial-mapper';
 import { getMarketSize } from '@/lib/competitor-ai';
+import { SERVER_ERROR_MESSAGE } from '@/lib/errors';
 
 export default function InterviewPage() {
   const router = useRouter();
@@ -39,8 +40,7 @@ export default function InterviewPage() {
       });
 
       if (!res.ok) {
-        const errText = await res.text().catch(() => '로컬 AI 호출 실패');
-        appendToLastAssistant(selectedPersona, `(${errText})`);
+        appendToLastAssistant(selectedPersona, `(${SERVER_ERROR_MESSAGE})`);
         setIsLoading(false);
         return;
       }
@@ -56,7 +56,7 @@ export default function InterviewPage() {
         }
       }
     } catch {
-      appendToLastAssistant(selectedPersona, '(네트워크 오류가 발생했습니다. 다시 시도해주세요.)');
+      appendToLastAssistant(selectedPersona, `(${SERVER_ERROR_MESSAGE})`);
     }
     setIsLoading(false);
   };

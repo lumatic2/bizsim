@@ -1,5 +1,6 @@
 import { getPersona, buildSystemPrompt } from '@/lib/personas';
 import type { PersonaId, Decisions, ChatMessage } from '@/lib/types';
+import { SERVER_ERROR_MESSAGE } from '@/lib/errors';
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'gemma4-ko:26b-q8';
@@ -44,14 +45,11 @@ export async function POST(req: Request) {
       }),
     });
   } catch {
-    return new Response(
-      `로컬 AI(${OLLAMA_HOST})에 연결할 수 없습니다. Ollama가 실행 중인지 확인하세요.`,
-      { status: 503 },
-    );
+    return new Response(SERVER_ERROR_MESSAGE, { status: 503 });
   }
 
   if (!upstream.ok || !upstream.body) {
-    return new Response(`로컬 AI 오류 (${upstream.status})`, { status: 502 });
+    return new Response(SERVER_ERROR_MESSAGE, { status: 502 });
   }
 
   const readable = new ReadableStream({
