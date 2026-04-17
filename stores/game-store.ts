@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { GameState, Decisions, SimulationResults, FinancialStatements, PersonaId, ChatMessage, CompetitorState, RoundSnapshot, CarryForwardBS } from '@/lib/types';
 import { INITIAL_COMPETITORS, updateCompetitorDecisions, qualityCapFromRd } from '@/lib/competitor-ai';
 
@@ -43,19 +44,21 @@ const initialState: GameState = {
   gameOver: false,
 };
 
-export const useGameStore = create<GameState & GameActions>((set) => ({
-  ...initialState,
+export const useGameStore = create<GameState & GameActions>()(
+  persist(
+    (set) => ({
+      ...initialState,
 
-  setDecisions: (partial) =>
-    set((s) => ({ decisions: { ...s.decisions, ...partial } })),
+      setDecisions: (partial) =>
+        set((s) => ({ decisions: { ...s.decisions, ...partial } })),
 
-  setChannels: (channels) =>
-    set((s) => ({ decisions: { ...s.decisions, channels } })),
+      setChannels: (channels) =>
+        set((s) => ({ decisions: { ...s.decisions, channels } })),
 
-  setResults: (results) => set({ results }),
-  setFinancials: (financials) => set({ financials }),
-  setStep: (step) => set({ step }),
-  setSelectedPersona: (id) => set({ selectedPersona: id }),
+      setResults: (results) => set({ results }),
+      setFinancials: (financials) => set({ financials }),
+      setStep: (step) => set({ step }),
+      setSelectedPersona: (id) => set({ selectedPersona: id }),
 
   addMessage: (personaId, message) =>
     set((s) => ({
@@ -120,5 +123,28 @@ export const useGameStore = create<GameState & GameActions>((set) => ({
     };
   }),
 
-  resetGame: () => set(initialState),
-}));
+      resetGame: () => set(initialState),
+    }),
+    {
+      name: 'bizsim-game',
+      version: 1,
+      skipHydration: true,
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        currentRound: state.currentRound,
+        maxRounds: state.maxRounds,
+        decisions: state.decisions,
+        results: state.results,
+        financials: state.financials,
+        chatHistories: state.chatHistories,
+        selectedPersona: state.selectedPersona,
+        roundHistory: state.roundHistory,
+        competitors: state.competitors,
+        cumulativeRd: state.cumulativeRd,
+        qualityCap: state.qualityCap,
+        previousBS: state.previousBS,
+        gameOver: state.gameOver,
+      }),
+    },
+  ),
+);

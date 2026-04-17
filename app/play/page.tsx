@@ -17,7 +17,7 @@ function formatMan(v: number) {
 
 export default function DecisionPage() {
   const router = useRouter();
-  const { decisions, setDecisions, setChannels, currentRound, competitors, qualityCap } = useGameStore();
+  const { decisions, setDecisions, setChannels, currentRound, competitors, qualityCap, resetGame, roundHistory } = useGameStore();
   const preview = useMemo(() => {
     const marketSize = getMarketSize(currentRound);
     return runSimulation(decisions, competitors, marketSize, qualityCap);
@@ -66,6 +66,19 @@ export default function DecisionPage() {
       <div style={{ background: 'var(--biz-primary-light)', borderColor: 'var(--biz-primary)' }} className="border rounded-lg p-3 mb-2 flex items-center gap-4 text-sm">
         <span style={{ background: 'var(--biz-primary)', color: 'white' }} className="px-2 py-0.5 rounded text-xs font-semibold">Round {currentRound}</span>
         <span style={{ color: 'var(--biz-text)' }}>한국 스마트홈 가전 시장 · 2026년 · 경기 보통 · 경쟁사 3개</span>
+        {(currentRound > 1 || roundHistory.length > 0) && (
+          <button
+            onClick={() => {
+              if (confirm('진행 중인 게임을 초기화하시겠습니까? 저장된 라운드 기록이 모두 삭제됩니다.')) {
+                resetGame();
+              }
+            }}
+            style={{ color: 'var(--biz-text-muted)', borderColor: 'var(--biz-border)' }}
+            className="ml-auto text-xs border px-2 py-0.5 rounded hover:opacity-75"
+          >
+            게임 초기화
+          </button>
+        )}
       </div>
 
       <h2 className="text-xs font-[Manrope] font-bold uppercase tracking-wider" style={{ color: 'var(--biz-text-muted)' }}>의사결정 레버</h2>
