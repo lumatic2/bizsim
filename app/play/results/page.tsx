@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/stores/game-store';
 import { MetricCard } from '@/components/MetricCard';
+import { AIDebrief } from '@/components/AIDebrief';
 import { PERSONAS } from '@/lib/personas';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, ZAxis } from 'recharts';
 
@@ -16,8 +17,21 @@ function formatKRW(value: number): string {
 
 export default function ResultsPage() {
   const router = useRouter();
-  const { results, decisions, currentRound } = useGameStore();
+  const { results, decisions, currentRound, roundHistory } = useGameStore();
   const [competitorTab, setCompetitorTab] = useState<'market' | 'ads' | 'channels'>('market');
+
+  const previousResults = useMemo(() => {
+    const prev = roundHistory[roundHistory.length - 1];
+    return prev ? prev.results : null;
+  }, [roundHistory]);
+
+  const debriefPayload = useMemo(
+    () =>
+      results
+        ? { mode: 'round' as const, round: currentRound, decisions, results, previousResults }
+        : null,
+    [results, currentRound, decisions, previousResults],
+  );
 
   useEffect(() => {
     if (!results) {
@@ -92,22 +106,14 @@ export default function ResultsPage() {
         </div>
       </div>
 
-      <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 mb-6">
-        <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--biz-text)' }}>AI 디브리프</h3>
-        <div className="space-y-2 text-sm" style={{ color: 'var(--biz-text-muted)' }}>
-          <p style={{ borderLeftColor: 'var(--biz-primary)' }} className="pl-3 border-l-2">
-            시장점유율 {results.marketShare}%로 시장에 진입했습니다.
-            {results.operatingProfit > 0
-              ? ' 영업 흑자를 달성하여 지속 가능한 출발입니다.'
-              : ' 영업 적자 상태이므로 비용 구조 개선이 필요합니다.'}
-          </p>
-          <p style={{ borderLeftColor: 'var(--biz-primary)' }} className="pl-3 border-l-2">
-            {PERSONAS.reduce((best, p) =>
-              results.segmentDemand[p.id] > results.segmentDemand[best.id] ? p : best
-            ).name} 세그먼트에서 가장 높은 반응을 보였습니다.
-          </p>
-        </div>
-      </div>
+      {debriefPayload && (
+        <AIDebrief
+          key={`round-${currentRound}`}
+          mode="round"
+          round={currentRound}
+          payload={debriefPayload}
+        />
+      )}
 
       {/* 포지셔닝 맵 */}
       <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 mb-6">

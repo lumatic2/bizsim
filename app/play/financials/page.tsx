@@ -122,12 +122,9 @@ export default function FinancialsPage() {
         </button>
         <button
           onClick={() => {
+            const isFinalRound = currentRound >= maxRounds;
             advanceRound();
-            if (currentRound >= maxRounds) {
-              router.push('/');
-            } else {
-              router.push('/play');
-            }
+            router.push(isFinalRound ? '/play/end' : '/play');
           }}
           style={{ background: 'var(--biz-primary)' }}
           className="text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-all"
