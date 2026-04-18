@@ -1,7 +1,8 @@
 # BizSim Roadmap
 
-마지막 업데이트: 2026-04-17
-비전: Markstrat의 무료·한국어·AI 네이티브 업그레이드판
+마지막 업데이트: 2026-04-18
+정체성: **포트폴리오/학습 프로젝트** (2026-04-18 office-hours에서 확정, 스타트업 아님)
+비전: AI 네이티브 경영 시뮬로서 "링크 한 줄로 평가되는" 완성된 작품
 
 ---
 
@@ -36,13 +37,29 @@ PRD v2.0까지 핵심 기능 구현됨:
 - [x] **서버 다운 시 통일된 에러 메시지** — `서버 연결 실패. "yusung@askewly.com"으로 문의` 로 통일 (`lib/errors.ts`)
 - [x] **재무제표 페이지에도 디브리프 노출** — store에 `roundDebriefs`/`finalDebrief` 캐시. 결과↔재무제표 이동 시 재호출 없음
 - [x] **게임 종료 차트 폴리싱** — 축 라벨·단위·0 기준선·data point 도트·tooltip 포맷 추가
-- [ ] **배포용 LAN/tunnel 문서화** — Tailscale·Cloudflare Tunnel 설정 가이드
 
-## PRD 보류 항목 (장기)
+---
 
-## PRD 보류 항목 (장기)
+## v1.0 스프린트 — 포트폴리오 완성 (2026-04-18 ~ 04-26, 1주)
 
-- [ ] 팀 멀티플레이어
+설계 문서: `~/.gstack/projects/lumatic2-bizsim/yusun-master-design-20260418-162117.md`
+
+목표: 링크 한 줄로 누구나 플레이 가능 + 블로그 1편 + `v1.0` 태그
+
+- [ ] **Day 1-2**: LLM provider 어댑터 (`lib/llm-provider.ts`) — ollama/openrouter 스위처
+  - `/api/chat`, `/api/debrief` 두 경로 어댑터 경유로 리팩토
+  - 환경변수: `LLM_PROVIDER`, `OPENROUTER_API_KEY`
+  - 무료 모델 후보 벤치: `google/gemma-2-9b-it:free`, `qwen/qwen-2.5-72b-instruct:free`
+- [ ] **Day 3**: Vercel 배포 + 프로덕션 엔드투엔드 플레이 통과
+- [ ] **Day 4**: README 재작성 + hero GIF 3개 + Mermaid 아키텍처 다이어그램
+- [ ] **Day 5-6**: 블로그 포스트 1편 (Markstrat pain 5개로 오프닝)
+- [ ] **Day 7**: ROADMAP·v1.0 태그 + GitHub Release
+
+**성공 기준**: 친구 1명에게 링크 던져서 5분 내 1라운드 플레이 완료
+
+## PRD 보류 항목 (장기, 정체성 재전환 시 재개)
+
+- [ ] 팀 멀티플레이어 (교수·학교 경로로 피벗 시에만)
 - [ ] 모바일 최적화
 - [ ] 회원/저장 서버 사이드
 - [ ] 큐잉 시뮬 활용 계획 구체화 후 `/lab/queue` 재가동
@@ -51,6 +68,7 @@ PRD v2.0까지 핵심 기능 구현됨:
 
 ## 진행 로그
 
+- 2026-04-18 /office-hours 세션 → 정체성 확정(포트폴리오/학습), 1주 v1.0 스프린트 정의. 설계 문서 APPROVED
 - 2026-04-17 디브리프 라운드별/최종 캐싱(store에 저장, 재호출 없음), 재무제표 페이지에도 디브리프 노출, /play/end 차트 축 라벨·tooltip 폴리싱
 - 2026-04-17 미사용 SDK 제거, 서버 에러 메시지 통일(`lib/errors.ts`), 디브리프 프롬프트에 판단 원칙 + 상황 태그 주입
 - 2026-04-17 인터뷰 경로도 로컬 Ollama로 전환 → 외부 API 의존 0
