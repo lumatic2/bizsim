@@ -160,9 +160,11 @@ describe('generateFinancials', () => {
 
   it('previous debt produces non-zero interest expense', () => {
     const prevBS = {
-      cash: 10_000_000_000, debt: 4_000_000_000, equity: 8_000_000_000,
+      cash: 10_000_000_000, receivables: 0, inventory: 0, payables: 0,
+      debt: 4_000_000_000, equity: 8_000_000_000,
       capitalSurplus: 0, retainedEarnings: 0, taxPayable: 0,
-      ppe: 10_000_000_000, taxPpe: 10_000_000_000, deferredTaxLiability: 0,
+      ppe: 10_000_000_000, taxPpe: 10_000_000_000,
+      deferredTaxLiability: 0, deferredTaxAsset: 0,
     };
     const r = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap);
     const withInterest = generateFinancials(DEFAULT_DECISIONS, r, prevBS);

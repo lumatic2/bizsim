@@ -38,7 +38,7 @@ export function generateFinancials(
   const dividendPaid = Math.min(Math.max(0, decisions.dividendPayout), distributable);
 
   const bs = generateBS(decisions, results, pnl, previousBS, event, dividendPaid, cumulativeProduction, supplyIndex, roundsCompleted);
-  const cf = generateCF(decisions, pnl, dividendPaid);
+  const cf = generateCF(decisions, pnl, previousBS, bs, dividendPaid);
   return { pnl, bs, cf };
 }
 
@@ -144,18 +144,25 @@ function generateBS(decisions: Decisions, results: SimulationResults, pnl: PnL, 
 
   // 배당은 generateFinancials에서 이미 배당가능이익 한도로 clamp된 값이 전달됨
 
-  // 현금흐름 구성:
-  //   + netIncome (발생기준)
-  //   + 감가상각 (비현금비용 가산)
-  //   − 매출채권 증가, − 재고 증가, − 전기말 미지급세금 납부 + 당기 세금 미지급 가산
-  //   − CAPEX, + 조달, − 배당
-  const cashFromOps = pnl.netIncome + pnl.depreciationExpense - receivables - inventory - prevTaxPayable + pnl.incomeTax;
-  const cash = prevCash + cashFromOps - decisions.capexInvestment + newDebt + newEquity - dividendPaid;
+  const payables = Math.round(pnl.cogs * 0.1);
+  const taxPayable = pnl.currentTax;  // 미지급법인세는 현금 기준 (이연법인세는 DTL/DTA 별도)
+
+  // 간접법 CF — 워킹캐피탈 변동 정식 반영:
+  //   CFO = NI + Dep + 이연법인세비용(비현금) − ΔAR − ΔInv + ΔAP + ΔTaxPayable
+  const prevAR = previousBS?.receivables ?? 0;
+  const prevInv = previousBS?.inventory ?? 0;
+  const prevAP = previousBS?.payables ?? 0;
+  const operatingCF = pnl.netIncome + pnl.depreciationExpense + pnl.deferredTaxExpense
+    - (receivables - prevAR)
+    - (inventory - prevInv)
+    + (payables - prevAP)
+    + (taxPayable - prevTaxPayable);
+  const investingCF = -decisions.capexInvestment;  // R&D는 NI에 이미 비용 반영 → CFI 중복 제거
+  const financingCF = newDebt + newEquity - dividendPaid;  // 이자는 NI에 이미 반영 (한국·IFRS는 CFO/CFF 선택 가능)
+  const netCashChange = operatingCF + investingCF + financingCF;
+  const cash = prevCash + netCashChange;
 
   const totalAssets = cash + receivables + inventory + ppe + deferredTaxAsset;
-  const payables = Math.round(pnl.cogs * 0.1);
-  // 미지급법인세는 현금 기준(이연세 제외). 이연법인세는 별도 DTL/DTA 항목으로 계상.
-  const taxPayable = pnl.currentTax;
 
   const debt = prevDebt + newDebt;
   // 증자 단순화: 전액 자본잉여금으로 계상. 액면자본금(equity)은 초기값 고정.
@@ -171,13 +178,39 @@ function generateBS(decisions: Decisions, results: SimulationResults, pnl: PnL, 
   };
 }
 
-function generateCF(decisions: Decisions, pnl: PnL, dividendPaid: number): CashFlow {
+function generateCF(
+  decisions: Decisions,
+  pnl: PnL,
+  previousBS: CarryForwardBS | null | undefined,
+  bs: BalanceSheet,
+  dividendPaid: number,
+): CashFlow {
   const { newDebt, newEquity } = decisions.financing;
-  // 간접법 간소화: 영업CF = 순이익 + 감가상각(비현금비용 가산).
-  const operatingCF = pnl.netIncome + pnl.depreciationExpense;
-  // 투자CF: R&D 지출(분기 환산) + 설비투자 모두 유출
-  const investingCF = -Math.round(decisions.rdBudget / 4) - decisions.capexInvestment;
-  const financingCF = newDebt + newEquity - pnl.interestExpense - dividendPaid;
+  const prevAR = previousBS?.receivables ?? 0;
+  const prevInv = previousBS?.inventory ?? 0;
+  const prevAP = previousBS?.payables ?? 0;
+  const prevTaxPayable = previousBS?.taxPayable ?? 0;
+
+  // 간접법 CFO: NI + 비현금비용 가산 + 워킹캐피탈 변동 조정
+  //   ΔAR↑ → 판매는 기록됐으나 현금 미수 → 차감
+  //   ΔInv↑ → 재고 쌓임 → 현금 유출 → 차감
+  //   ΔAP↑ → 공급사 대금 미지급 → 현금 보유 → 가산
+  //   ΔTaxPayable↑ → 세금 이연 납부 → 현금 보유 → 가산
+  //   deferredTaxExpense: NI에 차감된 비현금 이연법인세비용 환입
+  const operatingCF = pnl.netIncome
+    + pnl.depreciationExpense
+    + pnl.deferredTaxExpense
+    - (bs.receivables - prevAR)
+    - (bs.inventory - prevInv)
+    + (bs.payables - prevAP)
+    + (bs.taxPayable - prevTaxPayable);
+
+  // 투자CF: CAPEX만. R&D는 발생기준 비용으로 NI에 이미 반영 (operating expense).
+  const investingCF = -decisions.capexInvestment;
+
+  // 재무CF: 조달 — 배당. 이자는 NI에 비용 처리 (K-IFRS·IFRS 1001 CFO/CFF 선택 중 CFO로).
+  const financingCF = newDebt + newEquity - dividendPaid;
+
   const netCashChange = operatingCF + investingCF + financingCF;
 
   return { operatingCF, investingCF, financingCF, netCashChange };

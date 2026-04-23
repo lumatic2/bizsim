@@ -1,6 +1,6 @@
 # BizSim Roadmap
 
-마지막 업데이트: 2026-04-24 (5)
+마지막 업데이트: 2026-04-24 (6)
 정체성: **경영학 이론 기반 심화 시뮬**로서의 완성도 우선 (2026-04-23 재전환, 직전 "포트폴리오·배포 우선" 노선 대체)
 비전: 재무·세무회계, 전략론(Porter/BCG/Ansoff), 운영관리(Queueing/EOQ), 고급 마케팅, 조직경제학이 실제 레버·동학으로 녹아있는 시뮬레이션
 
@@ -27,12 +27,13 @@
 
 ## 이어서 할 일
 
-Phase E~H 완결 + Phase D 보강 + UX/해설/이직률까지 완료. 엔진 본체는 **100% 마무리**. 남은 건 배포·장기 트랙뿐:
+**엔진 100% 완결**. Phase D~H 모두 완료 + 간접법 CF 정식화까지. 남은 건 배포·장기 트랙뿐:
 
-- **LLM provider 어댑터** — 현재 Ollama 고정. OpenAI/Anthropic API 어댑터 추가 시 Vercel 배포 가능
-- **Vercel 배포 + hero GIF** — 위 어댑터 작업 후. v2.5 git 태그
-- **Phase D 남은 보강** — 간접법 CF 정식화 (현재 간소 영업CF)
+- **LLM provider 어댑터** — 현재 Ollama 고정. OpenAI/Anthropic API 어댑터 추가 시 Vercel 배포에서 AI 기능 활성화 가능. 또는 Tailscale로 로컬 PC와 연결
 - **시나리오·업적 레이어** — "Star 2분기 유지", "R&D 없이 흑자" 같은 업적 · 사전 시나리오 (위기 분기로 시작 등)
+- **난이도 설정** — easy/normal/hard로 경쟁사 공격성·이벤트 빈도 조정
+- **역사 모드** — "반도체 슈퍼사이클 2021", "IMF 1998" 프리셋 이벤트 시퀀스
+- **실제 게임 완주 테스트** — 본인이 6분기 완주하며 밸런스 감지. 이게 다음 방향 결정의 가장 큰 입력
 - **멀티플레이어/교수 대시보드** — 피벗 시에만 재고려 (정체성 재검토 필요)
 
 ---
@@ -82,6 +83,14 @@ Phase E~H 완결 + Phase D 보강 + UX/해설/이직률까지 완료. 엔진 본
 
 ## 진행 로그
 
+- 2026-04-24 (6) 간접법 CF 정식화 (183/183 테스트, store v17): Phase D 완전 마감.
+  - generateCF 재작성 — 워킹캐피탈 변동(ΔAR·ΔInv·ΔAP·ΔTaxPayable) 정식 조정
+  - 이연법인세비용 비현금 환입 CFO에 가산
+  - R&D rdBudget이 NI(rdExpense)에 이미 반영됨 → 투자CF에서 제거 (중복 계산 해결)
+  - 이자비용 NI에 반영됨 → 재무CF에서 제거 (중복 계산 해결)
+  - BS cash = prevCash + netCashChange 로 BS↔CF 완전 일관성 확보
+  - CarryForwardBS에 receivables·inventory·payables 추가
+  - /play/financials의 CF 탭 간접법 상세 표시 (NI → 비현금 가산 → ΔWC → CFO 체계)
 - 2026-04-24 (5) 엔진 최종 마감 5종 (176/176 테스트, store v16):
   - **4 디브리프에 프레임워크 주입** — framework-tags 상위 5개가 AI 디브리프 프롬프트에 자동 삽입, "최고 priority 1개 본문 인용" 규칙 추가
   - **2 Onboarding modal** (`components/OnboardingModal.tsx`) — 3스텝 인트로, localStorage 플래그로 1회만 노출

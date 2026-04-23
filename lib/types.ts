@@ -121,6 +121,9 @@ export type RoundSnapshot = {
 
 export type CarryForwardBS = {
   cash: number;
+  receivables: number;  // 매출채권 (간접법 CF에서 ΔAR 계산용)
+  inventory: number;    // 재고자산 (ΔInventory)
+  payables: number;     // 매입채무 (ΔAP)
   debt: number;
   equity: number;
   capitalSurplus: number;

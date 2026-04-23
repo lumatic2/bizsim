@@ -10,7 +10,7 @@ type Tab = 'pnl' | 'bs' | 'cf' | 'segment';
 
 export default function FinancialsPage() {
   const router = useRouter();
-  const { financials, results, decisions, currentRound, maxRounds, advanceRound, gameOver, roundHistory, roundDebriefs, setRoundDebrief, currentEvent, brandEquity, supplyIndex, cumulativeProduction, cumulativeImproveRd, cumulativeExploreRd } = useGameStore();
+  const { financials, results, decisions, currentRound, maxRounds, advanceRound, gameOver, roundHistory, roundDebriefs, setRoundDebrief, currentEvent, brandEquity, supplyIndex, cumulativeProduction, cumulativeImproveRd, cumulativeExploreRd, previousBS } = useGameStore();
   const [tab, setTab] = useState<Tab>('pnl');
 
   const previousResults = useMemo(() => {
@@ -91,10 +91,36 @@ export default function FinancialsPage() {
     { label: '총부채 및 자본', value: bs.totalLiabilities, isTotal: true },
   ];
 
+  // 간접법 CF 상세: NI → 비현금비용 가산 → 워킹캐피탈 변동 조정 → CFO
+  const prevAR = previousBS?.receivables ?? 0;
+  const prevInv = previousBS?.inventory ?? 0;
+  const prevAP = previousBS?.payables ?? 0;
+  const prevTaxPay = previousBS?.taxPayable ?? 0;
+  const deltaAR = bs.receivables - prevAR;
+  const deltaInv = bs.inventory - prevInv;
+  const deltaAP = bs.payables - prevAP;
+  const deltaTaxPay = bs.taxPayable - prevTaxPay;
+  const { newDebt, newEquity } = decisions.financing;
+  const dividendActual = Math.max(0, Math.min(decisions.dividendPayout, Math.max(0, (previousBS?.retainedEarnings ?? 0) + pnl.netIncome)));
+
   const cfRows = [
-    { label: '영업활동 현금흐름', value: cf.operatingCF },
-    { label: '투자활동 현금흐름', value: cf.investingCF },
-    { label: '재무활동 현금흐름', value: cf.financingCF },
+    { label: '영업활동 현금흐름 (간접법)', value: 0, isHeader: true },
+    { label: '당기순이익', value: pnl.netIncome },
+    { label: '  + 감가상각비 (비현금)', value: pnl.depreciationExpense },
+    { label: '  + 이연법인세비용 (비현금)', value: pnl.deferredTaxExpense },
+    { label: '  − 매출채권 증가 (ΔAR)', value: -deltaAR },
+    { label: '  − 재고 증가 (ΔInv)', value: -deltaInv },
+    { label: '  + 매입채무 증가 (ΔAP)', value: deltaAP },
+    { label: '  + 미지급법인세 증가 (ΔTaxPayable)', value: deltaTaxPay },
+    { label: '영업활동 현금흐름', value: cf.operatingCF, isTotal: true },
+    { label: '투자활동 현금흐름', value: 0, isHeader: true },
+    { label: '  − 설비투자 (CAPEX)', value: -decisions.capexInvestment },
+    { label: '투자CF 합계', value: cf.investingCF, isTotal: true },
+    { label: '재무활동 현금흐름', value: 0, isHeader: true },
+    { label: '  + 신규 차입금', value: newDebt },
+    { label: '  + 유상증자', value: newEquity },
+    { label: '  − 배당금 지급', value: -dividendActual },
+    { label: '재무CF 합계', value: cf.financingCF, isTotal: true },
     { label: '현금 증감', value: cf.netCashChange, isTotal: true },
   ];
 

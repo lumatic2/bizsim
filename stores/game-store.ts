@@ -152,6 +152,9 @@ export const useGameStore = create<GameState & GameActions>()(
     const bs = s.financials.bs;
     const newPreviousBS: CarryForwardBS = {
       cash: bs.cash,
+      receivables: bs.receivables,
+      inventory: bs.inventory,
+      payables: bs.payables,
       debt: bs.debt,
       equity: bs.equity,
       capitalSurplus: bs.capitalSurplus,
@@ -266,12 +269,12 @@ export const useGameStore = create<GameState & GameActions>()(
     }),
     {
       name: 'bizsim-game',
-      version: 16,
+      version: 17,
       skipHydration: true,
       storage: createJSONStorage(() => localStorage),
       migrate: (persisted: unknown, version: number) => {
-        // v16: 이직률 모델 — decisions.salaryMultiplier + lastAttrition 추가. 이전 버전 리셋.
-        if (version < 16) {
+        // v17: 간접법 CF 정식화 — CarryForwardBS에 receivables/inventory/payables 추가. 이전 버전 리셋.
+        if (version < 17) {
           return initialState;
         }
         return persisted;
