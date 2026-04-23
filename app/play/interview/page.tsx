@@ -6,14 +6,14 @@ import { useGameStore } from '@/stores/game-store';
 import { ChatInterface } from '@/components/ChatInterface';
 import { PERSONAS } from '@/lib/personas';
 import { runSimulation } from '@/lib/game-engine';
-import { generateFinancials } from '@/lib/financial-mapper';
+import { generateFinancials, INITIAL_PPE, productionCapacityFrom } from '@/lib/financial-mapper';
 import { getMarketSize } from '@/lib/competitor-ai';
 import { SERVER_ERROR_MESSAGE } from '@/lib/errors';
 
 export default function InterviewPage() {
   const router = useRouter();
   const {
-    decisions, chatHistories, selectedPersona, competitors, currentRound, qualityCap, previousBS, currentEvent, brandEquity,
+    decisions, chatHistories, selectedPersona, competitors, currentRound, qualityCap, previousBS, currentEvent, brandEquity, cumulativeLoss,
     setSelectedPersona, addMessage, appendToLastAssistant,
     setResults, setFinancials,
   } = useGameStore();
@@ -63,9 +63,10 @@ export default function InterviewPage() {
 
   const handleRunSimulation = () => {
     const marketSize = getMarketSize(currentRound);
-    const results = runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity);
+    const capacity = productionCapacityFrom(previousBS?.ppe ?? INITIAL_PPE);
+    const results = runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity);
     setResults(results);
-    const financials = generateFinancials(decisions, results, previousBS, currentEvent);
+    const financials = generateFinancials(decisions, results, previousBS, currentEvent, cumulativeLoss);
     setFinancials(financials);
     router.push('/play/results');
   };

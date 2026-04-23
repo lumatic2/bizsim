@@ -3,7 +3,7 @@
 ## Tech Stack
 - Next.js 15 (App Router), TypeScript, Tailwind CSS v4
 - Zustand (client state), Recharts (charts)
-- Claude API (@anthropic-ai/sdk) — server-side only
+- LLM: 로컬 Ollama (`gemma4-ko:26b-q8`) only — 외부 LLM SDK 의존 0
 
 ## Commands
 - `npm run dev` — 개발 서버

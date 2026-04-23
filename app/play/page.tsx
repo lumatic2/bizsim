@@ -6,6 +6,7 @@ import { useGameStore } from '@/stores/game-store';
 import { DecisionSlider } from '@/components/DecisionSlider';
 import { runSimulation } from '@/lib/game-engine';
 import { getMarketSize } from '@/lib/competitor-ai';
+import { INITIAL_PPE, productionCapacityFrom } from '@/lib/financial-mapper';
 import type { ProductId } from '@/lib/types';
 
 function formatBillion(v: number) {
@@ -18,12 +19,13 @@ function formatMan(v: number) {
 
 export default function DecisionPage() {
   const router = useRouter();
-  const { decisions, setDecisions, setChannels, setProduct, currentRound, competitors, qualityCap, resetGame, roundHistory, currentEvent, brandEquity } = useGameStore();
+  const { decisions, setDecisions, setChannels, setProduct, currentRound, competitors, qualityCap, resetGame, roundHistory, currentEvent, brandEquity, cumulativeLoss, previousBS } = useGameStore();
   const [activeProduct, setActiveProduct] = useState<ProductId>('A');
+  const capacity = productionCapacityFrom(previousBS?.ppe ?? INITIAL_PPE);
   const preview = useMemo(() => {
     const marketSize = getMarketSize(currentRound);
-    return runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity);
-  }, [decisions, currentRound, competitors, qualityCap, currentEvent, brandEquity]);
+    return runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity);
+  }, [decisions, currentRound, competitors, qualityCap, currentEvent, brandEquity, capacity]);
 
   const totalAd = decisions.adBudget.search + decisions.adBudget.display + decisions.adBudget.influencer;
   const totalProductionCost = decisions.products.reduce(
@@ -114,6 +116,11 @@ export default function DecisionPage() {
           />
         </div>
         <span className="font-mono" style={{ color: 'var(--biz-text)' }}>{brandEquity.toFixed(0)} / 100</span>
+        {cumulativeLoss > 0 && (
+          <span className="ml-4" title="이월결손금 — 다음 흑자 분기부터 과세표준에서 차감됨">
+            이월결손금 <span className="font-mono" style={{ color: 'var(--biz-text)' }}>₩{formatBillion(cumulativeLoss)}B</span>
+          </span>
+        )}
       </div>
 
       <h2 className="text-xs font-[Manrope] font-bold uppercase tracking-wider" style={{ color: 'var(--biz-text-muted)' }}>의사결정 레버</h2>
@@ -231,6 +238,31 @@ export default function DecisionPage() {
                 />
               </div>
             ))}
+          </div>
+
+          <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs" style={{ color: 'var(--biz-text-muted)' }}>
+                설비투자 (CAPEX)
+                <span className="ml-2 text-[10px] opacity-75">8분기 정액법 감가상각, 다음 분기부터 capacity 반영</span>
+              </div>
+              <div className="text-xs font-mono" style={{ color: 'var(--biz-text)' }}>capacity {capacity.toLocaleString()}대</div>
+            </div>
+            <div>
+              <div className="mb-1 flex items-center justify-between text-xs">
+                <span style={{ color: 'var(--biz-text-muted)' }}>이번 분기 설비투자</span>
+                <span className="font-mono" style={{ color: 'var(--biz-text)' }}>₩{formatBillion(decisions.capexInvestment)}B</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={5_000_000_000}
+                step={100_000_000}
+                value={decisions.capexInvestment}
+                onChange={(e) => setDecisions({ capexInvestment: Number(e.target.value) })}
+                className="w-full accent-gray-900"
+              />
+            </div>
           </div>
 
           <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 space-y-3">

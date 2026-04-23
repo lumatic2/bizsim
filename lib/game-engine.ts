@@ -70,6 +70,7 @@ export function runSimulation(
   qualityCap: number,
   event: RoundEvent = CALM_EVENT,
   brandEquity: number = NEUTRAL_BRAND,
+  productionCapacity: number = Infinity,
 ): SimulationResults {
   const effects = event.effects;
   const effectiveMarketSize = Math.round(marketSize * (effects.marketSizeMultiplier ?? 1));
@@ -77,6 +78,12 @@ export function runSimulation(
   const martPenalty = effects.martChannelPenalty ?? 1;
   const competitorBoost = effects.competitorQualityBoost ?? 0;
   const costMultiplier = effects.costMultiplier ?? 1;
+
+  // 생산능력 제약: 제품 A+B 합계가 capacity 초과 시 비례 축소하여 "실제 생산 가능량"으로 환산
+  const requestedProduction = decisions.products.reduce((s, p) => s + p.production, 0);
+  const capacityRatio = requestedProduction > productionCapacity && requestedProduction > 0
+    ? productionCapacity / requestedProduction
+    : 1;
 
   // 제품별 수요 계산. 캐니벌라이제이션은 단순화 (제품 A, B 독립 집계).
   const perProduct: Record<ProductId, ProductResult> = { A: emptyResult(decisions.products[0]), B: emptyResult(decisions.products[1]) };
@@ -98,7 +105,8 @@ export function runSimulation(
 
     const sd = calculateSegmentDemand(demandInput, effectiveMarketSize, martPenalty, brandEquity);
     const totalDemand = Object.values(sd).reduce((s, d) => s + d, 0);
-    const unitsSold = Math.min(totalDemand, product.production);
+    const effectiveProduction = Math.floor(product.production * capacityRatio);
+    const unitsSold = Math.min(totalDemand, effectiveProduction);
     const revenue = unitsSold * product.price;
     const unitCost = unitCostFor(effectiveQuality, costMultiplier);
     totalCogs += unitsSold * unitCost;
@@ -118,6 +126,7 @@ export function runSimulation(
     perProduct[product.id] = {
       id: product.id,
       name: product.name,
+      produced: effectiveProduction,
       unitsSold,
       revenue,
       segmentDemand: sd,
@@ -177,6 +186,7 @@ function emptyResult(product: ProductDecision): ProductResult {
   return {
     id: product.id,
     name: product.name,
+    produced: 0,
     unitsSold: 0,
     revenue: 0,
     segmentDemand: { jiyeon: 0, minsoo: 0, soonja: 0 },

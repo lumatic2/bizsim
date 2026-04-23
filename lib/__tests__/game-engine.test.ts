@@ -13,6 +13,7 @@ const DEFAULT_DECISIONS: Decisions = {
   adBudget: { search: 300_000_000, display: 250_000_000, influencer: 250_000_000 },
   channels: { online: 60, mart: 30, direct: 10 },
   financing: { newDebt: 0, newEquity: 0 },
+  capexInvestment: 0,
 };
 
 function withProducts(base: Decisions, products: [ProductDecision, ProductDecision]): Decisions {
@@ -93,6 +94,7 @@ describe('runSimulation', () => {
       adBudget: { search: 0, display: 0, influencer: 0 },
       channels: { online: 100, mart: 0, direct: 0 },
       financing: { newDebt: 0, newEquity: 0 },
+      capexInvestment: 0,
     };
     const result = runSimulation(extreme, INITIAL_COMPETITORS, marketSize, qualityCap);
     for (const demand of Object.values(result.segmentDemand)) {
@@ -152,5 +154,14 @@ describe('runSimulation', () => {
     expect(result.perProduct.B).toBeDefined();
     expect(result.perProduct.A.unitsSold + result.perProduct.B.unitsSold).toBe(result.unitsSold);
     expect(result.perProduct.A.revenue + result.perProduct.B.revenue).toBe(result.revenue);
+  });
+
+  it('production capacity caps actual production proportionally', () => {
+    // 요청 생산: 8k + 7k = 15k. capacity 10k로 제한 → 각 제품 실제 생산 비례 축소
+    const capped = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap, CALM_EVENT, 50, 10_000);
+    expect(capped.perProduct.A.produced + capped.perProduct.B.produced).toBeLessThanOrEqual(10_000);
+    // capacity가 무제한이면 원래 production 상한까지 가능
+    const free = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap, CALM_EVENT, 50, Infinity);
+    expect(free.perProduct.A.produced).toBe(PRODUCT_A.production);
   });
 });

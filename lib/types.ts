@@ -39,6 +39,7 @@ export type Decisions = {
   adBudget: AdMix;
   channels: { online: number; mart: number; direct: number };
   financing: Financing;
+  capexInvestment: number;  // 이번 분기 설비투자 (유형자산 증가, 다음 분기부터 capacity 반영)
 };
 
 export type ChatMessage = {
@@ -94,12 +95,16 @@ export type CarryForwardBS = {
   cash: number;
   debt: number;
   equity: number;
+  capitalSurplus: number;
   retainedEarnings: number;
+  taxPayable: number;
+  ppe: number;
 };
 
 export type ProductResult = {
   id: ProductId;
   name: string;
+  produced: number;   // 실제 생산량 (capacity 제약 반영 후)
   unitsSold: number;
   revenue: number;
   segmentDemand: Record<PersonaId, number>;
@@ -123,9 +128,13 @@ export type PnL = {
   grossProfit: number;
   adExpense: number;
   rdExpense: number;
+  depreciationExpense: number; // 유형자산 감가상각비 (정액법)
   otherExpense: number;
   operatingProfit: number;
   interestExpense: number;
+  pretaxIncome: number;
+  incomeTax: number;        // 산출세액 − R&D 세액공제
+  rdTaxCredit: number;      // 조특법 §10 (중소기업 25%)
   netIncome: number;
 };
 
@@ -133,10 +142,13 @@ export type BalanceSheet = {
   cash: number;
   receivables: number;
   inventory: number;
+  ppe: number;              // 유형자산 장부가 (정액법 감가상각 후)
   totalAssets: number;
   payables: number;
+  taxPayable: number;
   debt: number;
-  equity: number;
+  equity: number;           // 자본금 (액면)
+  capitalSurplus: number;   // 자본잉여금 (주식발행초과금)
   retainedEarnings: number;
   totalLiabilities: number;
 };
@@ -173,4 +185,5 @@ export type GameState = {
   finalDebrief: string | null;
   currentEvent: RoundEvent;
   brandEquity: number;
+  cumulativeLoss: number;  // 이월결손금 잔액 (누적 적자 - 이미 공제 사용된 분)
 };

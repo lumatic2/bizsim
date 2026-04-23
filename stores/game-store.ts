@@ -15,6 +15,7 @@ const DEFAULT_DECISIONS: Decisions = {
   adBudget: { search: 300_000_000, display: 250_000_000, influencer: 250_000_000 },
   channels: { online: 60, mart: 30, direct: 10 },
   financing: { newDebt: 0, newEquity: 0 },
+  capexInvestment: 0,
 };
 
 type GameActions = {
@@ -52,6 +53,7 @@ const initialState: GameState = {
   finalDebrief: null,
   currentEvent: CALM_EVENT,
   brandEquity: 30,
+  cumulativeLoss: 0,
 };
 
 export const useGameStore = create<GameState & GameActions>()(
@@ -122,7 +124,10 @@ export const useGameStore = create<GameState & GameActions>()(
       cash: bs.cash,
       debt: bs.debt,
       equity: bs.equity,
+      capitalSurplus: bs.capitalSurplus,
       retainedEarnings: bs.retainedEarnings,
+      taxPayable: bs.taxPayable,
+      ppe: bs.ppe,
     };
     const nextRound = s.currentRound + 1;
     const newCompetitors = updateCompetitorDecisions(
@@ -138,6 +143,16 @@ export const useGameStore = create<GameState & GameActions>()(
     const eventPenalty = s.currentEvent.effects.brandEquityPenalty ?? 0;
     const dilutionPenalty = s.decisions.financing.newEquity / 1_000_000_000; // 증자 1B당 -1 pt
     const newBrandEquity = Math.max(0, Math.min(100, s.brandEquity * 0.9 + adGrowth - eventPenalty - dilutionPenalty));
+
+    // 이월결손금 갱신: 당기 법인세차감전순이익 기준 (게임 전체 기간 이월, 실제 법령 15년 단순화)
+    const pretax = s.financials.pnl.pretaxIncome;
+    let newCumulativeLoss = s.cumulativeLoss;
+    if (pretax > 0) {
+      const used = Math.min(pretax, newCumulativeLoss);
+      newCumulativeLoss -= used;
+    } else if (pretax < 0) {
+      newCumulativeLoss += -pretax;
+    }
 
     const nextEvent = rollEvent(nextRound);
 
@@ -155,6 +170,7 @@ export const useGameStore = create<GameState & GameActions>()(
       gameOver: nextRound > s.maxRounds,
       currentEvent: nextEvent,
       brandEquity: newBrandEquity,
+      cumulativeLoss: newCumulativeLoss,
     };
   }),
 
@@ -162,12 +178,12 @@ export const useGameStore = create<GameState & GameActions>()(
     }),
     {
       name: 'bizsim-game',
-      version: 4,
+      version: 5,
       skipHydration: true,
       storage: createJSONStorage(() => localStorage),
       migrate: (persisted: unknown, version: number) => {
-        // Decisions 구조가 여러 번 바뀌었으므로 v4 이전 세션은 안전하게 초기 상태로 리셋한다.
-        if (version < 4) {
+        // v5: Phase D 묶음1/2 (법인세·자본잉여금·이월결손금) 구조 추가. 이전 버전은 전부 리셋.
+        if (version < 5) {
           return initialState;
         }
         return persisted;
@@ -190,6 +206,7 @@ export const useGameStore = create<GameState & GameActions>()(
         finalDebrief: state.finalDebrief,
         currentEvent: state.currentEvent,
         brandEquity: state.brandEquity,
+        cumulativeLoss: state.cumulativeLoss,
       }),
     },
   ),
