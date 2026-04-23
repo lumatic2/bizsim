@@ -7,6 +7,7 @@ import { MetricCard } from '@/components/MetricCard';
 import { AIDebrief } from '@/components/AIDebrief';
 import { PERSONAS } from '@/lib/personas';
 import { computeBCGPositions } from '@/lib/bcg';
+import { computeCLV } from '@/lib/clv';
 import type { SimulationResults, Decisions, RoundSnapshot } from '@/lib/types';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea, ResponsiveContainer, ZAxis } from 'recharts';
 
@@ -19,7 +20,7 @@ function formatKRW(value: number): string {
 
 export default function ResultsPage() {
   const router = useRouter();
-  const { results, decisions, currentRound, roundHistory, roundDebriefs, setRoundDebrief, currentEvent, brandEquity } = useGameStore();
+  const { results, decisions, currentRound, roundHistory, roundDebriefs, setRoundDebrief, currentEvent, brandEquity, supplyIndex, cumulativeProduction, cumulativeImproveRd, cumulativeExploreRd } = useGameStore();
   const [competitorTab, setCompetitorTab] = useState<'market' | 'ads' | 'channels'>('market');
 
   const previousResults = useMemo(() => {
@@ -30,9 +31,9 @@ export default function ResultsPage() {
   const debriefPayload = useMemo(
     () =>
       results
-        ? { mode: 'round' as const, round: currentRound, decisions, results, previousResults, event: currentEvent, brandEquity }
+        ? { mode: 'round' as const, round: currentRound, decisions, results, previousResults, event: currentEvent, brandEquity, supplyIndex, cumulativeProduction, cumulativeImproveRd, cumulativeExploreRd, roundHistory }
         : null,
-    [results, currentRound, decisions, previousResults, currentEvent, brandEquity],
+    [results, currentRound, decisions, previousResults, currentEvent, brandEquity, supplyIndex, cumulativeProduction, cumulativeImproveRd, cumulativeExploreRd, roundHistory],
   );
 
   useEffect(() => {
@@ -54,7 +55,7 @@ export default function ResultsPage() {
         {currentRound}분기 경영 시뮬레이션의 최종 결과입니다.
       </p>
 
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-4 gap-3 mb-4">
         <MetricCard label="시장점유율" value={`${results.marketShare}%`} delta={`Round ${currentRound}`} deltaUp />
         <MetricCard label="매출" value={formatKRW(results.revenue)} delta={`Round ${currentRound}`} deltaUp={results.revenue > 0} />
         <MetricCard
@@ -65,6 +66,10 @@ export default function ResultsPage() {
         />
         <MetricCard label="고객 만족도" value={`${results.satisfaction}`} delta="/100" deltaUp={results.satisfaction > 50} />
       </div>
+
+      {/* CLV 대시보드 */}
+      <CLVCard results={results} brandEquity={brandEquity} />
+
 
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div>
@@ -321,6 +326,64 @@ export default function ResultsPage() {
         >
           재무제표 보기 →
         </button>
+      </div>
+    </div>
+  );
+}
+
+type CLVCardProps = {
+  results: SimulationResults;
+  brandEquity: number;
+};
+
+function CLVCard({ results, brandEquity }: CLVCardProps) {
+  const clv = useMemo(
+    () => computeCLV(results.revenue, results.unitsSold, results.satisfaction, brandEquity),
+    [results.revenue, results.unitsSold, results.satisfaction, brandEquity],
+  );
+  const clvMillion = clv.clv / 1_000_000;
+  const retentionPct = clv.retention * 100;
+  return (
+    <div
+      className="border rounded-lg p-4 mb-6"
+      style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }}
+    >
+      <div className="flex items-baseline justify-between mb-3">
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--biz-text)' }}>Customer Lifetime Value (CLV)</h3>
+        <span className="text-[11px]" style={{ color: 'var(--biz-text-muted)' }}>평균 객단가 × 기대 재구매 횟수</span>
+      </div>
+      <div className="grid grid-cols-4 gap-3 text-sm">
+        <div style={{ background: 'var(--biz-primary-light)', borderColor: 'var(--biz-border)' }} className="border rounded-md p-3">
+          <div className="text-[11px]" style={{ color: 'var(--biz-text-muted)' }}>CLV</div>
+          <div className="text-xl font-[Manrope] font-bold" style={{ color: 'var(--biz-primary)' }}>
+            ₩{clvMillion >= 1 ? `${clvMillion.toFixed(2)}M` : `${(clv.clv / 1_000).toFixed(0)}K`}
+          </div>
+        </div>
+        <div className="border rounded-md p-3" style={{ borderColor: 'var(--biz-border)' }}>
+          <div className="text-[11px]" style={{ color: 'var(--biz-text-muted)' }}>평균 객단가 (AOV)</div>
+          <div className="text-base font-mono" style={{ color: 'var(--biz-text)' }}>
+            ₩{clv.aov >= 1_000_000 ? `${(clv.aov / 1_000_000).toFixed(2)}M` : `${(clv.aov / 10_000).toFixed(1)}만`}
+          </div>
+        </div>
+        <div className="border rounded-md p-3" style={{ borderColor: 'var(--biz-border)' }}>
+          <div className="text-[11px]" style={{ color: 'var(--biz-text-muted)' }}>분기 재구매 확률</div>
+          <div className="text-base font-mono" style={{ color: 'var(--biz-text)' }}>{retentionPct.toFixed(1)}%</div>
+          <div className="text-[10px] mt-0.5" style={{ color: 'var(--biz-text-muted)' }}>
+            만족 {(clv.satisfactionContribution * 100).toFixed(0)}% + 브랜드 {(clv.brandContribution * 100).toFixed(0)}%
+          </div>
+        </div>
+        <div className="border rounded-md p-3" style={{ borderColor: 'var(--biz-border)' }}>
+          <div className="text-[11px]" style={{ color: 'var(--biz-text-muted)' }}>기대 재구매 횟수</div>
+          <div className="text-base font-mono" style={{ color: 'var(--biz-text)' }}>{clv.repurchaseCycles.toFixed(1)}회</div>
+          <div className="text-[10px] mt-0.5" style={{ color: 'var(--biz-text-muted)' }}>무한등비급수 근사, 상한 20회</div>
+        </div>
+      </div>
+      <div className="text-[11px] mt-3 px-3 py-2 rounded" style={{ background: 'var(--biz-primary-light)', color: 'var(--biz-text-muted)' }}>
+        {clv.retention >= 0.7
+          ? `로열티 강함 — 광고 확대로 신규 유입해도 회수 가능 (CLV 기여 ${clv.repurchaseCycles.toFixed(1)}회)`
+          : clv.retention >= 0.5
+          ? `리텐션 정상 범위 — 만족도·브랜드 투자가 CLV 복리로 작용`
+          : `리텐션 낮음 — 가격 인하·광고 확대 전에 만족도(서비스 capacity, 품질)·브랜드 우선 회복 권장`}
       </div>
     </div>
   );

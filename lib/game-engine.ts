@@ -76,6 +76,11 @@ export function runSimulation(
   cumulativeProduction: Record<ProductId, number> = { A: 0, B: 0 },
   supplyIndex: number = 1,
   exploreBoost: number = 0,
+  // 이번 분기 실현 생산량 (생산 리드타임: 전 분기 의사결정분). 미지정 시 즉시생산 가정(레거시 호환).
+  pendingProduction: Record<ProductId, number> = {
+    A: decisions.products[0].production,
+    B: decisions.products[1].production,
+  },
 ): SimulationResults {
   const effects = event.effects;
   const effectiveMarketSize = Math.round(marketSize * (effects.marketSizeMultiplier ?? 1));
@@ -86,8 +91,9 @@ export function runSimulation(
   const competitorBoost = effects.competitorQualityBoost ?? 0;
   const costMultiplier = effects.costMultiplier ?? 1;
 
-  // 생산능력 제약: 제품 A+B 합계가 capacity 초과 시 비례 축소하여 "실제 생산 가능량"으로 환산
-  const requestedProduction = decisions.products.reduce((s, p) => s + p.production, 0);
+  // 생산능력 제약: 실현 생산(pending) 합계가 capacity 초과 시 비례 축소.
+  // 리드타임 도입 후 capacity 제약은 "이번 분기 실제 제조 가능량"에만 적용.
+  const requestedProduction = pendingProduction.A + pendingProduction.B;
   const capacityRatio = requestedProduction > productionCapacity && requestedProduction > 0
     ? productionCapacity / requestedProduction
     : 1;
@@ -114,7 +120,8 @@ export function runSimulation(
 
     const sd = calculateSegmentDemand(demandInput, playerMarketSize, martPenalty, brandEquity);
     const totalDemand = Object.values(sd).reduce((s, d) => s + d, 0);
-    const effectiveProduction = Math.floor(product.production * capacityRatio);
+    // 실현 생산량(전분기 결정분 또는 레거시 즉시생산) × capacity 제약 비율
+    const effectiveProduction = Math.floor((pendingProduction[product.id] ?? product.production) * capacityRatio);
     const unitsSold = Math.min(totalDemand, effectiveProduction);
     const revenue = unitsSold * product.price;
     // 학습곡선: 기초 누적생산량 기준으로 이번 분기 unit cost 체감 계수 결정.

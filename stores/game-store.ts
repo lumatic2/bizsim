@@ -63,6 +63,8 @@ const initialState: GameState = {
   supplyIndex: DEFAULT_SUPPLY_INDEX,
   cumulativeImproveRd: 0,
   cumulativeExploreRd: 0,
+  // 생산 리드타임: R1 시작 시 "이미 만들어둔" 기초 재고 (초기 default production과 동일하게 세팅 — 기존 즉시생산 밸런스 유지)
+  pendingProduction: { A: 8_000, B: 7_000 },
 };
 
 export const useGameStore = create<GameState & GameActions>()(
@@ -196,6 +198,12 @@ export const useGameStore = create<GameState & GameActions>()(
     // 공급자 교섭력: 다음 라운드 원자재 가격 지수를 AR(1) + drift로 갱신
     const newSupplyIndex = rollSupplyIndex(s.supplyIndex);
 
+    // 생산 리드타임: 이번 분기 의사결정한 production → 다음 분기 실현 생산량으로 이월
+    const newPendingProduction: Record<ProductId, number> = {
+      A: s.decisions.products[0].production,
+      B: s.decisions.products[1].production,
+    };
+
     return {
       roundHistory: [...s.roundHistory, snapshot],
       currentRound: nextRound,
@@ -215,6 +223,7 @@ export const useGameStore = create<GameState & GameActions>()(
       supplyIndex: newSupplyIndex,
       cumulativeImproveRd: newCumulativeImproveRd,
       cumulativeExploreRd: newCumulativeExploreRd,
+      pendingProduction: newPendingProduction,
     };
   }),
 
@@ -222,12 +231,12 @@ export const useGameStore = create<GameState & GameActions>()(
     }),
     {
       name: 'bizsim-game',
-      version: 11,
+      version: 12,
       skipHydration: true,
       storage: createJSONStorage(() => localStorage),
       migrate: (persisted: unknown, version: number) => {
-        // v11: Phase F Queueing 흡수 — decisions.serviceCapacity + results.serviceQueue 추가. 이전 버전은 리셋.
-        if (version < 11) {
+        // v12: Phase F 심화 — 생산 리드타임 pendingProduction stock 추가. 이전 버전은 리셋.
+        if (version < 12) {
           return initialState;
         }
         return persisted;
@@ -255,6 +264,7 @@ export const useGameStore = create<GameState & GameActions>()(
         supplyIndex: state.supplyIndex,
         cumulativeImproveRd: state.cumulativeImproveRd,
         cumulativeExploreRd: state.cumulativeExploreRd,
+        pendingProduction: state.pendingProduction,
       }),
     },
   ),

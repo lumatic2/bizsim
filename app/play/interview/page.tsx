@@ -14,7 +14,7 @@ import { SERVER_ERROR_MESSAGE } from '@/lib/errors';
 export default function InterviewPage() {
   const router = useRouter();
   const {
-    decisions, chatHistories, selectedPersona, competitors, currentRound, qualityCap, previousBS, currentEvent, brandEquity, cumulativeLoss, cumulativeProduction, supplyIndex, cumulativeExploreRd,
+    decisions, chatHistories, selectedPersona, competitors, currentRound, qualityCap, previousBS, currentEvent, brandEquity, cumulativeLoss, cumulativeProduction, supplyIndex, cumulativeExploreRd, pendingProduction,
     setSelectedPersona, addMessage, appendToLastAssistant,
     setResults, setFinancials,
   } = useGameStore();
@@ -66,7 +66,7 @@ export default function InterviewPage() {
     const marketSize = getMarketSize(currentRound);
     const capacity = productionCapacityFrom(previousBS?.ppe ?? INITIAL_PPE);
     const exploreBoost = exploreBoostFrom(cumulativeExploreRd);
-    const results = runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost);
+    const results = runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost, pendingProduction);
     setResults(results);
     const financials = generateFinancials(decisions, results, previousBS, currentEvent, cumulativeLoss, cumulativeProduction, supplyIndex);
     setFinancials(financials);

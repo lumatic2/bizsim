@@ -1,5 +1,9 @@
-import type { Decisions, SimulationResults, RoundSnapshot, RoundEvent } from '@/lib/types';
+import type { Decisions, SimulationResults, RoundSnapshot, RoundEvent, ProductId } from '@/lib/types';
 import { SERVER_ERROR_MESSAGE } from '@/lib/errors';
+import { learningCurveMultiplier } from '@/lib/learning-curve';
+import { classifyPressure, PRESSURE_LABELS } from '@/lib/supply';
+import { exploreBoostFrom } from '@/lib/ansoff';
+import { classifyQuadrant, computeMarketGrowth, QUADRANT_LABELS } from '@/lib/bcg';
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'gemma4-ko:26b-q8';
@@ -12,6 +16,11 @@ type RoundBody = {
   previousResults?: SimulationResults | null;
   event?: RoundEvent | null;
   brandEquity?: number;
+  supplyIndex?: number;
+  cumulativeProduction?: Record<ProductId, number>;
+  cumulativeImproveRd?: number;
+  cumulativeExploreRd?: number;
+  roundHistory?: RoundSnapshot[];
 };
 
 type FinalBody = {
@@ -29,7 +38,7 @@ function fmtKRW(v: number): string {
 }
 
 function buildRoundPrompt(body: RoundBody): string {
-  const { round, decisions, results, previousResults, event, brandEquity } = body;
+  const { round, decisions, results, previousResults, event, brandEquity, supplyIndex, cumulativeProduction, cumulativeImproveRd, cumulativeExploreRd, roundHistory } = body;
   const competitorAvgPrice = Math.round(
     results.competitors.reduce((s, c) => s + c.price, 0) / Math.max(1, results.competitors.length),
   );
@@ -45,6 +54,20 @@ function buildRoundPrompt(body: RoundBody): string {
   const totalProduction = decisions.products.reduce((s, p) => s + p.production, 0);
   const avgPrice = decisions.products.reduce((s, p) => s + p.price, 0) / decisions.products.length;
   const avgQuality = decisions.products.reduce((s, p) => s + p.quality, 0) / decisions.products.length;
+
+  // BCG 분면 계산
+  const topCompetitorShare = results.competitors.reduce((max, c) => (c.marketShare > max ? c.marketShare : max), 0);
+  const safeTop = Math.max(topCompetitorShare, 0.1);
+  const marketGrowth = computeMarketGrowth(results, roundHistory ?? []);
+  const bcgPositions = decisions.products.map((p) => {
+    const pr = results.perProduct[p.id];
+    const totalMarket = results.marketShare > 0 && results.unitsSold > 0
+      ? results.unitsSold / (results.marketShare / 100)
+      : Math.max(results.marketSize, 1);
+    const productShare = totalMarket > 0 ? (pr.unitsSold / totalMarket) * 100 : 0;
+    const relativeShare = productShare / safeTop;
+    return { id: p.id, name: p.name, relativeShare, quadrant: classifyQuadrant(relativeShare, marketGrowth) };
+  });
 
   const tags: string[] = [];
   if (results.operatingProfit < 0) tags.push('영업적자');
@@ -62,6 +85,16 @@ function buildRoundPrompt(body: RoundBody): string {
     const pr = results.perProduct[p.id];
     if (pr && pr.unitsSold === 0 && p.production > 0) tags.push(`${p.name} 전혀 안 팔림`);
   }
+  if (results.serviceQueue.overflow > 0) tags.push(`서비스 overflow ${results.serviceQueue.overflow.toLocaleString()}대`);
+  else if (results.serviceQueue.utilization >= 0.9 && results.serviceQueue.utilization !== Infinity) tags.push(`서비스 부하 높음 ρ ${results.serviceQueue.utilization.toFixed(2)}`);
+  if (typeof supplyIndex === 'number') {
+    const pressure = classifyPressure(supplyIndex);
+    if (pressure === 'crisis' || pressure === 'tight') tags.push(`원자재 ${PRESSURE_LABELS[pressure]} (SPI ×${supplyIndex.toFixed(2)})`);
+    else if (pressure === 'favorable') tags.push('원자재 약세 호기');
+  }
+  for (const bcg of bcgPositions) {
+    tags.push(`${bcg.id} ${QUADRANT_LABELS[bcg.quadrant]}`);
+  }
 
   const eventLine = event && event.id !== 'calm'
     ? `[이번 분기 이벤트] ${event.title} (${event.severity === 'good' ? '기회' : '리스크'}) — ${event.description}`
@@ -70,6 +103,20 @@ function buildRoundPrompt(body: RoundBody): string {
     ? `[브랜드 에쿼티] ${brandEquity.toFixed(0)} / 100 (100에 가까울수록 가격 저항 완화)`
     : null;
 
+  // 전략 레버 상태 라인
+  const supplyLine = typeof supplyIndex === 'number'
+    ? `[공급자 교섭력] SPI ×${supplyIndex.toFixed(3)} (${PRESSURE_LABELS[classifyPressure(supplyIndex)]}) — 이벤트 costMultiplier와 곱셈으로 원가 반영`
+    : null;
+  const learningLine = cumulativeProduction
+    ? `[학습곡선] A 누적 ${cumulativeProduction.A.toLocaleString()}대 (원가 ×${learningCurveMultiplier(cumulativeProduction.A).toFixed(3)}) · B 누적 ${cumulativeProduction.B.toLocaleString()}대 (원가 ×${learningCurveMultiplier(cumulativeProduction.B).toFixed(3)}) — Wright's Law`
+    : null;
+  const ansoffBoost = typeof cumulativeExploreRd === 'number' ? exploreBoostFrom(cumulativeExploreRd) : 0;
+  const ansoffLine = typeof cumulativeImproveRd === 'number' && typeof cumulativeExploreRd === 'number'
+    ? `[Ansoff R&D] 이번 분기 개선/탐색 ${decisions.rdAllocation.improve}/${decisions.rdAllocation.explore}% · 누적 개선 ${fmtKRW(cumulativeImproveRd)} 탐색 ${fmtKRW(cumulativeExploreRd)} → 플레이어 전용 시장 +${(ansoffBoost * 100).toFixed(1)}%`
+    : null;
+  const queueLine = `[서비스 큐] 용량 ${decisions.serviceCapacity.toLocaleString()}대 · ρ ${results.serviceQueue.utilization === Infinity ? '∞' : results.serviceQueue.utilization.toFixed(2)} · 만족도 델타 ${results.serviceQueue.satisfactionDelta >= 0 ? '+' : ''}${results.serviceQueue.satisfactionDelta}${results.serviceQueue.overflow > 0 ? ` · overflow ${results.serviceQueue.overflow.toLocaleString()}대 판매손실` : ''}`;
+  const bcgLine = `[BCG 분면] ${bcgPositions.map((b) => `${b.id} ${QUADRANT_LABELS[b.quadrant]} (상대점유 ${b.relativeShare.toFixed(2)})`).join(' · ')} · 시장성장률 ${marketGrowth.toFixed(1)}%`;
+
   const lines: (string | null)[] = [
     `BizSim 경영 시뮬레이션 ${round}분기 결과를 플레이어에게 2-3문장으로 해설해줘.`,
     ``,
@@ -77,6 +124,10 @@ function buildRoundPrompt(body: RoundBody): string {
     `- 영업적자 상태면 광고·R&D 증액은 제안 금지. 가격·비용·생산량 조정을 우선 검토.`,
     `- 재고과잉이면 다음 분기 생산 축소 또는 할인 프로모션 제안.`,
     `- 품절/수요초과면 생산 증대 또는 가격 인상 제안.`,
+    `- 서비스 overflow가 있으면 serviceCapacity 확충 또는 판매량 조절을 우선 제안.`,
+    `- SPI가 crisis/tight일 때 광고 증액 금지, 가격 인상 또는 탐색 R&D 이전 검토.`,
+    `- BCG 분면(Star/Cash Cow/Question Mark/Dog)에 맞는 전략 언급 가능 — Star는 공격투자, Cash Cow는 현금창출, Question Mark는 선택집중, Dog는 퇴출검토.`,
+    `- 학습곡선 원가계수가 유의미(<0.9)하면 규모경제 기회로 해석.`,
     `- 이벤트가 있으면 해당 이벤트가 성과에 어떻게 작용했는지 한 번 언급.`,
     `- 제안은 정확히 하나만 (여러 개 나열 금지).`,
     `- 구체적인 숫자(%, 금액, 또는 증감폭) 최소 1개를 본문에 인용.`,
@@ -85,14 +136,19 @@ function buildRoundPrompt(body: RoundBody): string {
     `[상황 태그] ${tags.length > 0 ? tags.join(' · ') : '특이사항 없음'}`,
     eventLine,
     brandLine,
+    supplyLine,
+    learningLine,
+    ansoffLine,
+    queueLine,
+    bcgLine,
     ``,
     `[우리회사 의사결정]`,
     ...decisions.products.map((p) => {
       const pr = results.perProduct[p.id];
       return `- ${p.name} (${p.id}): 가격 ${fmtKRW(p.price)} 품질 ${p.quality}/5 생산 ${p.production.toLocaleString()}대 → 판매 ${pr ? pr.unitsSold.toLocaleString() : 0}대 / 매출 ${fmtKRW(pr?.revenue ?? 0)}`;
     }),
-    `공유: R&D ${fmtKRW(decisions.rdBudget)}, 광고 합계 ${fmtKRW(decisions.adBudget.search + decisions.adBudget.display + decisions.adBudget.influencer)} (검색 ${fmtKRW(decisions.adBudget.search)}/디스플레이 ${fmtKRW(decisions.adBudget.display)}/인플루언서 ${fmtKRW(decisions.adBudget.influencer)})`,
-    `채널 온라인 ${decisions.channels.online}% / 마트 ${decisions.channels.mart}% / 직영 ${decisions.channels.direct}%`,
+    `공유: R&D ${fmtKRW(decisions.rdBudget)} (개선 ${decisions.rdAllocation.improve}% / 탐색 ${decisions.rdAllocation.explore}%), 광고 합계 ${fmtKRW(decisions.adBudget.search + decisions.adBudget.display + decisions.adBudget.influencer)} (검색 ${fmtKRW(decisions.adBudget.search)}/디스플레이 ${fmtKRW(decisions.adBudget.display)}/인플루언서 ${fmtKRW(decisions.adBudget.influencer)})`,
+    `채널 온라인 ${decisions.channels.online}% / 마트 ${decisions.channels.mart}% / 직영 ${decisions.channels.direct}% · 서비스 capacity ${decisions.serviceCapacity.toLocaleString()}대 · CAPEX ${fmtKRW(decisions.capexInvestment)}`,
     `평균가 ${fmtKRW(avgPrice)} · 평균 품질 ${avgQuality.toFixed(1)}/5`,
     ``,
     `[성과]`,
@@ -114,13 +170,17 @@ function buildFinalPrompt(body: FinalBody): string {
   const lines = history.map(
     (r) => {
       const eventTag = r.event && r.event.id !== 'calm' ? ` [${r.event.title}]` : '';
-      return `R${r.round}: 점유 ${r.results.marketShare}%, 매출 ${fmtKRW(r.results.revenue)}, 영업이익 ${fmtKRW(r.results.operatingProfit)}${eventTag}`;
+      const spiTag = typeof r.supplyIndex === 'number' ? ` SPI×${r.supplyIndex.toFixed(2)}` : '';
+      return `R${r.round}: 점유 ${r.results.marketShare}%, 매출 ${fmtKRW(r.results.revenue)}, 영업이익 ${fmtKRW(r.results.operatingProfit)}, 만족도 ${r.results.satisfaction}${eventTag}${spiTag}`;
     },
   );
 
   const profitableRounds = history.filter((r) => r.results.operatingProfit > 0).length;
   const peakShare = Math.max(...history.map((r) => r.results.marketShare));
   const peakRound = history.find((r) => r.results.marketShare === peakShare)?.round;
+  const overflowRounds = history.filter((r) => r.results.serviceQueue?.overflow > 0).length;
+  const finalBrand = history[history.length - 1]?.brandEquity ?? 0;
+  const firstBrand = history[0]?.brandEquity ?? 0;
 
   return [
     `BizSim ${history.length}분기 전체 경영 성과를 플레이어에게 총평해줘. 4-5문장 한국어.`,
@@ -128,11 +188,13 @@ function buildFinalPrompt(body: FinalBody): string {
     `[판단 원칙]`,
     `- 네 가지를 모두 포함: (1) 전반 평가, (2) 가장 잘한 전략, (3) 아쉬운 점, (4) 실무 인사이트 1개.`,
     `- 일반론("가격 경쟁력 강화" 같은 뻔한 말) 금지. 분기별 실제 숫자에 기반한 구체 분석.`,
+    `- 전략 프레임워크(BCG, Ansoff, Porter, Wright's Law 중 하나)를 1회 이상 언급해 분석을 뒷받침.`,
     `- 구체 수치 최소 2개 인용 (예: "R${peakRound}에서 점유율 ${peakShare}% 정점", "6분기 중 ${profitableRounds}분기 흑자").`,
     `- 해설만 출력, 서론이나 마무리 인사 없이.`,
     ``,
     `[누적 성과]`,
     `총매출 ${fmtKRW(totalRevenue)} / 총 영업이익 ${fmtKRW(totalProfit)} / 평균 점유율 ${avgShare.toFixed(1)}% / 흑자분기 ${profitableRounds}/${history.length} / 최고 점유율 ${peakShare}% (R${peakRound})`,
+    `브랜드 에쿼티 ${firstBrand.toFixed(0)} → ${finalBrand.toFixed(0)}${overflowRounds > 0 ? ` · 서비스 overflow 발생 ${overflowRounds}회` : ''}`,
     ``,
     `[분기별 추이]`,
     ...lines,

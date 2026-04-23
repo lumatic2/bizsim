@@ -217,4 +217,5 @@ export type GameState = {
   supplyIndex: number;  // 공급자 교섭력 지수 (Porter 5 Forces) — 1.0 기준, 원자재 가격 배수
   cumulativeImproveRd: number;  // Ansoff improve 누적 R&D (quality cap 산출 기반)
   cumulativeExploreRd: number;  // Ansoff explore 누적 R&D (시장 확장 부스트 기반)
+  pendingProduction: Record<ProductId, number>;  // 생산 리드타임: 이번 분기에 실현되는 제품별 생산량 (전 분기 의사결정분)
 };
