@@ -27,9 +27,12 @@
 ### Phase D — 재무·세무회계 완성 ✅ 2026-04-23
 - [x] 법인세 — 한국 누진세율표(9/19/21/24%) 분기 단위 연환산 적용
 - [x] R&D 세액공제 — 조특법 §10 중소기업 25%, 산출세액 50% 한도
-- [x] 감가상각 + CAPEX — 8분기 정액법, ppe 500,000원당 1대 capacity, 기말 반영(다음 분기부터 capacity 증가)
+- [x] 감가상각 + CAPEX — 회계상 8분기 정액법, 세법상 4분기 가속상각, ppe 500,000원당 1대 capacity
 - [x] 자본잉여금 분리 — 증자 시 capitalSurplus에 계상
 - [x] 결손금 이월공제 — 게임 전체 기간 이월 (15년 단순화)
+- [x] 배당 — 배당가능이익(상법 §462) 한도 내 현금 배당, BS·CF 반영
+- [x] 이연법인세 — 세법·회계 감가상각 일시차이에서 DTL 누적, PnL에 currentTax/deferredTaxExpense 분리
+- [x] 원가배분 정교화 — ProductResult에 cogs/grossProfit/allocatedOverhead/segmentProfit, 매출 비중 기반 배분. 재무제표 "제품별 손익" 탭 추가
 
 ### Phase E — 전략론 (Porter·BCG·Ansoff)
 - 학습곡선 / 경험곡선 (누적 생산량 → unit cost 체감, BCG Cash Cow 원리)
@@ -67,6 +70,7 @@
 
 ## 진행 로그
 
+- 2026-04-23 Phase D 확장: 배당(상법 §462) + 이연법인세(세법·회계 일시차이) + 원가배분 정교화(제품별 segmentProfit, 재무제표 제품별 손익 탭). 46/46 테스트 pass
 - 2026-04-23 Phase D 재무·세무회계 완성: 법인세·R&D 세액공제·자본잉여금 분리·결손금 이월·CAPEX/감가상각/생산capacity. PnL에 pretaxIncome/incomeTax/rdTaxCredit/depreciationExpense, BS에 taxPayable/capitalSurplus/ppe. 41/41 테스트 pass
 - 2026-04-23 정체성 재전환: 포트폴리오·배포 우선 → 경영학 이론 심화 우선. 배포는 Phase D~H 완료 후 장기 후순위로 이동. AGENTS.md(Codex 잔재) 제거, CLAUDE.md의 `@anthropic-ai/sdk` 문구 정정
 - 2026-04-23 v2.0 Phase A/B/C 5개 기능 모두 구현 `8842731` (이벤트 카드·브랜드 에쿼티·마케팅 믹스·자본 조달·제품 라인 2개). 33/33 테스트, 빌드 ✓

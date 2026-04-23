@@ -14,6 +14,7 @@ const DEFAULT_DECISIONS: Decisions = {
   channels: { online: 60, mart: 30, direct: 10 },
   financing: { newDebt: 0, newEquity: 0 },
   capexInvestment: 0,
+  dividendPayout: 0,
 };
 
 const TOTAL_AD = DEFAULT_DECISIONS.adBudget.search + DEFAULT_DECISIONS.adBudget.display + DEFAULT_DECISIONS.adBudget.influencer;
@@ -53,7 +54,7 @@ describe('generateFinancials', () => {
     expect(financials.pnl.netIncome).toBe(financials.pnl.pretaxIncome - financials.pnl.incomeTax);
   });
 
-  it('loss yields no income tax', () => {
+  it('loss yields no cash tax (but deferred tax may still apply from depreciation diff)', () => {
     const lossDecisions: Decisions = {
       ...DEFAULT_DECISIONS,
       adBudget: { search: 5_000_000_000, display: 5_000_000_000, influencer: 5_000_000_000 },
@@ -61,7 +62,7 @@ describe('generateFinancials', () => {
     const r = runSimulation(lossDecisions, INITIAL_COMPETITORS, marketSize, qualityCap);
     const f = generateFinancials(lossDecisions, r, null);
     expect(f.pnl.pretaxIncome).toBeLessThan(0);
-    expect(f.pnl.incomeTax).toBe(0);
+    expect(f.pnl.currentTax).toBe(0);
   });
 
   it('R&D tax credit reduces income tax', () => {
@@ -77,8 +78,44 @@ describe('generateFinancials', () => {
     }
   });
 
-  it('tax payable on BS equals current period income tax', () => {
-    expect(financials.bs.taxPayable).toBe(financials.pnl.incomeTax);
+  it('tax payable on BS equals current period cash tax (not total income tax)', () => {
+    expect(financials.bs.taxPayable).toBe(financials.pnl.currentTax);
+  });
+
+  it('incomeTax = currentTax + deferredTaxExpense', () => {
+    expect(financials.pnl.incomeTax).toBe(financials.pnl.currentTax + financials.pnl.deferredTaxExpense);
+  });
+
+  it('first quarter with gains produces positive deferred tax liability (accelerated tax dep > acct dep)', () => {
+    // 초기 ppe 10B, 회계 12.5% = 1.25B, 세법 25% = 2.5B → depDiff 1.25B 양수 → DTL 증가
+    const r = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap);
+    const f = generateFinancials(DEFAULT_DECISIONS, r, null);
+    expect(f.pnl.deferredTaxExpense).toBeGreaterThan(0);
+    expect(f.bs.deferredTaxLiability).toBeGreaterThan(0);
+  });
+
+  it('dividend payout reduces cash and retained earnings by same amount', () => {
+    const highDividend: Decisions = { ...DEFAULT_DECISIONS, dividendPayout: 500_000_000 };
+    const r = runSimulation(highDividend, INITIAL_COMPETITORS, marketSize, qualityCap);
+    const base = generateFinancials(DEFAULT_DECISIONS, r, null);
+    const paid = generateFinancials(highDividend, r, null);
+    // 배당은 배당가능이익 한도 내에서만 — 흑자 분기라 500M은 가능
+    if (paid.pnl.netIncome > 500_000_000) {
+      expect(base.bs.cash - paid.bs.cash).toBe(500_000_000);
+      expect(base.bs.retainedEarnings - paid.bs.retainedEarnings).toBe(500_000_000);
+    }
+  });
+
+  it('dividend is capped at distributable retained earnings (no deficit distribution)', () => {
+    // 과도한 배당 요청: 실제 지급액은 distributable(prev retained + netIncome) 한도로 clamp
+    const greedy: Decisions = { ...DEFAULT_DECISIONS, dividendPayout: 50_000_000_000 }; // 500억 시도
+    const r = runSimulation(greedy, INITIAL_COMPETITORS, marketSize, qualityCap);
+    const noDividend: Decisions = { ...DEFAULT_DECISIONS, dividendPayout: 0 };
+    const fNone = generateFinancials(noDividend, r, null);
+    const fGreedy = generateFinancials(greedy, r, null);
+    const cashDelta = fNone.bs.cash - fGreedy.bs.cash;
+    const distributable = Math.max(0, fNone.bs.retainedEarnings);
+    expect(cashDelta).toBeLessThanOrEqual(distributable);
   });
 
   it('inventory reflects unsold units across products', () => {
@@ -120,7 +157,8 @@ describe('generateFinancials', () => {
   it('previous debt produces non-zero interest expense', () => {
     const prevBS = {
       cash: 10_000_000_000, debt: 4_000_000_000, equity: 8_000_000_000,
-      capitalSurplus: 0, retainedEarnings: 0, taxPayable: 0, ppe: 10_000_000_000,
+      capitalSurplus: 0, retainedEarnings: 0, taxPayable: 0,
+      ppe: 10_000_000_000, taxPpe: 10_000_000_000, deferredTaxLiability: 0,
     };
     const r = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap);
     const withInterest = generateFinancials(DEFAULT_DECISIONS, r, prevBS);

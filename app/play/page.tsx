@@ -267,8 +267,23 @@ export default function DecisionPage() {
 
           <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 space-y-3">
             <div className="text-xs" style={{ color: 'var(--biz-text-muted)' }}>
-              재무 조달 (선택)
-              <span className="ml-2 text-[10px] opacity-75">부채는 이자비용 증가, 증자는 브랜드 희석 페널티</span>
+              배당 · 재무 조달 (선택)
+              <span className="ml-2 text-[10px] opacity-75">배당은 배당가능이익 한도 내로 자동 제한</span>
+            </div>
+            <div>
+              <div className="mb-1 flex items-center justify-between text-xs">
+                <span style={{ color: 'var(--biz-text-muted)' }}>현금 배당 (이익잉여금 차감)</span>
+                <span className="font-mono" style={{ color: 'var(--biz-text)' }}>₩{formatBillion(decisions.dividendPayout)}B</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={3_000_000_000}
+                step={100_000_000}
+                value={decisions.dividendPayout}
+                onChange={(e) => setDecisions({ dividendPayout: Number(e.target.value) })}
+                className="w-full accent-gray-900"
+              />
             </div>
             <div>
               <div className="mb-1 flex items-center justify-between text-xs">

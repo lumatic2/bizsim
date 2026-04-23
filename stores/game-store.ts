@@ -16,6 +16,7 @@ const DEFAULT_DECISIONS: Decisions = {
   channels: { online: 60, mart: 30, direct: 10 },
   financing: { newDebt: 0, newEquity: 0 },
   capexInvestment: 0,
+  dividendPayout: 0,
 };
 
 type GameActions = {
@@ -128,6 +129,8 @@ export const useGameStore = create<GameState & GameActions>()(
       retainedEarnings: bs.retainedEarnings,
       taxPayable: bs.taxPayable,
       ppe: bs.ppe,
+      taxPpe: bs.taxPpe,
+      deferredTaxLiability: bs.deferredTaxLiability,
     };
     const nextRound = s.currentRound + 1;
     const newCompetitors = updateCompetitorDecisions(
@@ -178,12 +181,12 @@ export const useGameStore = create<GameState & GameActions>()(
     }),
     {
       name: 'bizsim-game',
-      version: 5,
+      version: 6,
       skipHydration: true,
       storage: createJSONStorage(() => localStorage),
       migrate: (persisted: unknown, version: number) => {
-        // v5: Phase D 묶음1/2 (법인세·자본잉여금·이월결손금) 구조 추가. 이전 버전은 전부 리셋.
-        if (version < 5) {
+        // v6: Phase D 묶음4 (배당·이연법인세·원가배분) 구조 추가. 이전 버전은 전부 리셋.
+        if (version < 6) {
           return initialState;
         }
         return persisted;

@@ -85,6 +85,8 @@ export function runSimulation(
     ? productionCapacity / requestedProduction
     : 1;
 
+  const totalAd = decisions.adBudget.search + decisions.adBudget.display + decisions.adBudget.influencer;
+
   // 제품별 수요 계산. 캐니벌라이제이션은 단순화 (제품 A, B 독립 집계).
   const perProduct: Record<ProductId, ProductResult> = { A: emptyResult(decisions.products[0]), B: emptyResult(decisions.products[1]) };
   let totalUnitsSold = 0;
@@ -109,7 +111,8 @@ export function runSimulation(
     const unitsSold = Math.min(totalDemand, effectiveProduction);
     const revenue = unitsSold * product.price;
     const unitCost = unitCostFor(effectiveQuality, costMultiplier);
-    totalCogs += unitsSold * unitCost;
+    const productCogs = unitsSold * unitCost;
+    totalCogs += productCogs;
     totalUnitsSold += unitsSold;
     totalRevenue += revenue;
 
@@ -129,8 +132,23 @@ export function runSimulation(
       produced: effectiveProduction,
       unitsSold,
       revenue,
+      cogs: productCogs,
+      grossProfit: revenue - productCogs,
+      allocatedOverhead: 0, // 배분은 재무 단계에서 PnL 확정 후 재계산 (runSimulation 말미에 채움)
+      segmentProfit: revenue - productCogs,
       segmentDemand: sd,
     };
+  }
+
+  // 공통간접비 매출 비중 배분: 광고·R&D·감가상각·일반관리비·이자비용 합계를 제품 매출 비율로 나눔.
+  // 감가상각과 이자는 이 시점엔 아직 모름 → financial-mapper에서 다시 덮어씀. 여기서는 판매단계 OH만 배분.
+  // 단순화: 여기서는 광고비 + R&D + otherExpense(고정 100M)만 배분. 감가/이자/세금은 PnL 확정 후.
+  const runtimeOverhead = totalAd + decisions.rdBudget / 4 + 100_000_000;
+  for (const id of ['A', 'B'] as ProductId[]) {
+    const pr = perProduct[id];
+    const share = totalRevenue > 0 ? pr.revenue / totalRevenue : 0.5;
+    pr.allocatedOverhead = Math.round(runtimeOverhead * share);
+    pr.segmentProfit = pr.grossProfit - pr.allocatedOverhead;
   }
 
   // 경쟁사 수요: 대표 제품 하나로 모델링 (기존 구조 유지)
@@ -150,7 +168,6 @@ export function runSimulation(
   const totalMarket = totalUnitsSold + competitorDemandTotal;
   const marketShare = totalMarket > 0 ? Math.round((totalUnitsSold / totalMarket) * 100 * 10) / 10 : 0;
 
-  const totalAd = decisions.adBudget.search + decisions.adBudget.display + decisions.adBudget.influencer;
   const grossProfit = totalRevenue - totalCogs;
   const operatingProfit = grossProfit - totalAd - decisions.rdBudget / 4 - 100_000_000;
 
@@ -189,6 +206,10 @@ function emptyResult(product: ProductDecision): ProductResult {
     produced: 0,
     unitsSold: 0,
     revenue: 0,
+    cogs: 0,
+    grossProfit: 0,
+    allocatedOverhead: 0,
+    segmentProfit: 0,
     segmentDemand: { jiyeon: 0, minsoo: 0, soonja: 0 },
   };
 }

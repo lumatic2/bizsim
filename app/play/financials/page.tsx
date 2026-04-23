@@ -6,7 +6,7 @@ import { useGameStore } from '@/stores/game-store';
 import { FinancialTable } from '@/components/FinancialTable';
 import { AIDebrief } from '@/components/AIDebrief';
 
-type Tab = 'pnl' | 'bs' | 'cf';
+type Tab = 'pnl' | 'bs' | 'cf' | 'segment';
 
 export default function FinancialsPage() {
   const router = useRouter();
@@ -40,6 +40,7 @@ export default function FinancialsPage() {
     { id: 'pnl', label: '손익계산서' },
     { id: 'bs', label: '재무상태표' },
     { id: 'cf', label: '현금흐름표' },
+    { id: 'segment', label: '제품별 손익' },
   ];
 
   const { pnl, bs, cf } = financials;
@@ -58,7 +59,9 @@ export default function FinancialsPage() {
     { label: '영업외', value: 0, isHeader: true },
     { label: '이자비용', value: -pnl.interestExpense },
     { label: '법인세차감전순이익', value: pnl.pretaxIncome, isTotal: true },
-    { label: '법인세비용', value: -pnl.incomeTax },
+    { label: '법인세비용(계)', value: -pnl.incomeTax },
+    { label: '  ↳ 당기 현금 법인세', value: -pnl.currentTax },
+    { label: '  ↳ 이연법인세비용', value: -pnl.deferredTaxExpense },
     { label: '  ↳ R&D 세액공제 반영', value: pnl.rdTaxCredit },
     { label: '당기순이익', value: pnl.netIncome, isTotal: true },
   ];
@@ -73,6 +76,7 @@ export default function FinancialsPage() {
     { label: '부채', value: 0, isHeader: true },
     { label: '매입채무', value: bs.payables },
     { label: '미지급법인세', value: bs.taxPayable },
+    { label: '이연법인세부채', value: bs.deferredTaxLiability },
     { label: '차입금', value: bs.debt },
     { label: '자본', value: 0, isHeader: true },
     { label: '자본금', value: bs.equity },
@@ -88,7 +92,26 @@ export default function FinancialsPage() {
     { label: '현금 증감', value: cf.netCashChange, isTotal: true },
   ];
 
-  const tableRows = tab === 'pnl' ? pnlRows : tab === 'bs' ? bsRows : cfRows;
+  // 제품별 손익: 매출 비중 기반 완전 배분 (감가상각·이자·세금 포함). "full-cost" 관점 사업부 손익.
+  const totalOverheadFull = pnl.adExpense + pnl.rdExpense + pnl.depreciationExpense + pnl.otherExpense + pnl.interestExpense + pnl.incomeTax;
+  const segmentRows = (() => {
+    const rows: { label: string; value: number; isHeader?: boolean; isTotal?: boolean }[] = [];
+    for (const p of decisions.products) {
+      const pr = results.perProduct[p.id];
+      const share = pnl.revenue > 0 ? pr.revenue / pnl.revenue : 0;
+      const allocatedFull = Math.round(totalOverheadFull * share);
+      const segmentNet = pr.grossProfit - allocatedFull;
+      rows.push({ label: `${p.id} · ${p.name}`, value: 0, isHeader: true });
+      rows.push({ label: '매출', value: pr.revenue });
+      rows.push({ label: '매출원가', value: -pr.cogs });
+      rows.push({ label: '매출총이익', value: pr.grossProfit, isTotal: true });
+      rows.push({ label: `공통간접비 배분 (매출비중 ${(share * 100).toFixed(1)}%)`, value: -allocatedFull });
+      rows.push({ label: '사업부 순이익', value: segmentNet, isTotal: true });
+    }
+    return rows;
+  })();
+
+  const tableRows = tab === 'pnl' ? pnlRows : tab === 'bs' ? bsRows : tab === 'cf' ? cfRows : segmentRows;
 
   return (
     <div className="max-w-5xl mx-auto">

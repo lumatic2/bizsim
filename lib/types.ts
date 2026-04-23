@@ -40,6 +40,7 @@ export type Decisions = {
   channels: { online: number; mart: number; direct: number };
   financing: Financing;
   capexInvestment: number;  // 이번 분기 설비투자 (유형자산 증가, 다음 분기부터 capacity 반영)
+  dividendPayout: number;   // 이익잉여금에서 지급하는 현금 배당 (상법 §462 배당가능이익 한도)
 };
 
 export type ChatMessage = {
@@ -99,6 +100,8 @@ export type CarryForwardBS = {
   retainedEarnings: number;
   taxPayable: number;
   ppe: number;
+  taxPpe: number;                 // 세법상 유형자산 장부가 (외부 공시 X, 내부 관리용)
+  deferredTaxLiability: number;
 };
 
 export type ProductResult = {
@@ -107,6 +110,10 @@ export type ProductResult = {
   produced: number;   // 실제 생산량 (capacity 제약 반영 후)
   unitsSold: number;
   revenue: number;
+  cogs: number;                // 제품별 매출원가 (변동제조원가 합)
+  grossProfit: number;         // revenue − cogs
+  allocatedOverhead: number;   // 매출 비중 기반 배분된 공통간접비 (광고·R&D·감가상각·일반관리비)
+  segmentProfit: number;       // grossProfit − allocatedOverhead (사업부문 이익)
   segmentDemand: Record<PersonaId, number>;
 };
 
@@ -128,13 +135,15 @@ export type PnL = {
   grossProfit: number;
   adExpense: number;
   rdExpense: number;
-  depreciationExpense: number; // 유형자산 감가상각비 (정액법)
+  depreciationExpense: number;  // 회계상 감가상각비 (정액법 12.5%/분기)
   otherExpense: number;
   operatingProfit: number;
   interestExpense: number;
   pretaxIncome: number;
-  incomeTax: number;        // 산출세액 − R&D 세액공제
-  rdTaxCredit: number;      // 조특법 §10 (중소기업 25%)
+  currentTax: number;           // 당기 현금 법인세 (세법상 과세소득 기반, 실제 납부 대상)
+  deferredTaxExpense: number;   // 이연법인세비용 (음수면 이연법인세수익)
+  rdTaxCredit: number;          // 조특법 §10 (중소기업 25%)
+  incomeTax: number;            // 회계상 총 법인세비용 = currentTax + deferredTaxExpense
   netIncome: number;
 };
 
@@ -143,9 +152,11 @@ export type BalanceSheet = {
   receivables: number;
   inventory: number;
   ppe: number;              // 유형자산 장부가 (정액법 감가상각 후)
+  taxPpe: number;           // [내부] 세법상 유형자산 장부가 (UI 미노출, carry-forward 용)
   totalAssets: number;
   payables: number;
   taxPayable: number;
+  deferredTaxLiability: number;  // 이연법인세부채 (세법·회계 일시차이 × 세율 누적)
   debt: number;
   equity: number;           // 자본금 (액면)
   capitalSurplus: number;   // 자본잉여금 (주식발행초과금)

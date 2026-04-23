@@ -14,6 +14,7 @@ const DEFAULT_DECISIONS: Decisions = {
   channels: { online: 60, mart: 30, direct: 10 },
   financing: { newDebt: 0, newEquity: 0 },
   capexInvestment: 0,
+  dividendPayout: 0,
 };
 
 function withProducts(base: Decisions, products: [ProductDecision, ProductDecision]): Decisions {
@@ -95,6 +96,7 @@ describe('runSimulation', () => {
       channels: { online: 100, mart: 0, direct: 0 },
       financing: { newDebt: 0, newEquity: 0 },
       capexInvestment: 0,
+      dividendPayout: 0,
     };
     const result = runSimulation(extreme, INITIAL_COMPETITORS, marketSize, qualityCap);
     for (const demand of Object.values(result.segmentDemand)) {
@@ -154,6 +156,22 @@ describe('runSimulation', () => {
     expect(result.perProduct.B).toBeDefined();
     expect(result.perProduct.A.unitsSold + result.perProduct.B.unitsSold).toBe(result.unitsSold);
     expect(result.perProduct.A.revenue + result.perProduct.B.revenue).toBe(result.revenue);
+  });
+
+  it('perProduct reports cogs, grossProfit, and allocatedOverhead', () => {
+    const result = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap);
+    for (const pid of ['A', 'B'] as const) {
+      const pr = result.perProduct[pid];
+      expect(pr.cogs).toBeGreaterThanOrEqual(0);
+      expect(pr.grossProfit).toBe(pr.revenue - pr.cogs);
+      expect(pr.allocatedOverhead).toBeGreaterThanOrEqual(0);
+      expect(pr.segmentProfit).toBe(pr.grossProfit - pr.allocatedOverhead);
+    }
+    // 배분 합은 runtime overhead 근사 (광고 + R&D/4 + 100M) — 반올림 오차 허용
+    const totalOH = result.perProduct.A.allocatedOverhead + result.perProduct.B.allocatedOverhead;
+    const runtimeOH = (DEFAULT_DECISIONS.adBudget.search + DEFAULT_DECISIONS.adBudget.display + DEFAULT_DECISIONS.adBudget.influencer)
+      + DEFAULT_DECISIONS.rdBudget / 4 + 100_000_000;
+    expect(Math.abs(totalOH - runtimeOH)).toBeLessThan(10);
   });
 
   it('production capacity caps actual production proportionally', () => {
