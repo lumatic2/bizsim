@@ -14,7 +14,13 @@ export const INITIAL_COMPETITORS: CompetitorState[] = [
     marketShare: 22,
     revenue: 4_800_000_000,
     unitsSold: 22_000,
-    cumulativeRd: 6_000_000_000,  // 공격형 리더 — 기초 R&D 많음
+    cumulativeRd: 6_000_000_000,
+    archetype: {
+      label: '공격형 리더',
+      summary: '다국적 가전 대기업의 한국법인. 시장 리더십을 수호하려 공격적으로 대응.',
+      strengths: '강한 R&D 스태미나 · 대형마트 유통망 · 높은 광고 예산',
+      playbook: '점유율 위협 시 광고 +15% · 가격 −5% 동시 대응. 고점유 유지 시 가격 +3% 이익 추구.',
+    },
   },
   {
     name: '혁신전자',
@@ -25,7 +31,13 @@ export const INITIAL_COMPETITORS: CompetitorState[] = [
     marketShare: 18,
     revenue: 3_200_000_000,
     unitsSold: 18_000,
-    cumulativeRd: 3_500_000_000,  // 가성비형 추격자
+    cumulativeRd: 3_500_000_000,
+    archetype: {
+      label: '가성비형 추격자',
+      summary: '중견 제조사. 온라인 중심으로 가격 대비 성능을 강점으로 키우는 추격자.',
+      strengths: '온라인 우위 · 중간 가격대 · 품질 차별화 의지',
+      playbook: '점유율 하락 시 R&D 긴급 투입으로 품질 +0.2pt 추격. 공격 시점이 명확.',
+    },
   },
   {
     name: '로컬베스트',
@@ -36,7 +48,13 @@ export const INITIAL_COMPETITORS: CompetitorState[] = [
     marketShare: 15,
     revenue: 2_100_000_000,
     unitsSold: 15_000,
-    cumulativeRd: 1_500_000_000,  // 수비형 — R&D 여유 적음
+    cumulativeRd: 1_500_000_000,
+    archetype: {
+      label: '수비형 로컬',
+      summary: '한국 토종 브랜드. 광고·R&D 모두 여유가 적어 수비적이고 가격 대응이 주무기.',
+      strengths: '저가 포지셔닝 · 지역 밀착 유통 · 운영 비용 효율',
+      playbook: '점유율 방어 어려울 때 가격 −8% 출혈 경쟁. 공세 국면 진입은 드묾.',
+    },
   },
 ];
 

@@ -18,6 +18,7 @@ const DEFAULT_DECISIONS: Decisions = {
   dividendPayout: 0,
   serviceCapacity: 20_000,
   headcount: { sales: 4, rd: 4 },
+  salaryMultiplier: 1.0,
 };
 
 const TOTAL_AD = DEFAULT_DECISIONS.adBudget.search + DEFAULT_DECISIONS.adBudget.display + DEFAULT_DECISIONS.adBudget.influencer;

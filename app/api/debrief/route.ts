@@ -4,6 +4,7 @@ import { learningCurveMultiplier } from '@/lib/learning-curve';
 import { classifyPressure, PRESSURE_LABELS } from '@/lib/supply';
 import { exploreBoostFrom } from '@/lib/ansoff';
 import { classifyQuadrant, computeMarketGrowth, QUADRANT_LABELS } from '@/lib/bcg';
+import { matchFrameworkTags } from '@/lib/framework-tags';
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'gemma4-ko:26b-q8';
@@ -117,6 +118,23 @@ function buildRoundPrompt(body: RoundBody): string {
   const queueLine = `[서비스 큐] 용량 ${decisions.serviceCapacity.toLocaleString()}대 · ρ ${results.serviceQueue.utilization === Infinity ? '∞' : results.serviceQueue.utilization.toFixed(2)} · 만족도 델타 ${results.serviceQueue.satisfactionDelta >= 0 ? '+' : ''}${results.serviceQueue.satisfactionDelta}${results.serviceQueue.overflow > 0 ? ` · overflow ${results.serviceQueue.overflow.toLocaleString()}대 판매손실` : ''}`;
   const bcgLine = `[BCG 분면] ${bcgPositions.map((b) => `${b.id} ${QUADRANT_LABELS[b.quadrant]} (상대점유 ${b.relativeShare.toFixed(2)})`).join(' · ')} · 시장성장률 ${marketGrowth.toFixed(1)}%`;
 
+  // 프레임워크 태그 자동 매칭 — 상위 5개. AI가 이를 해설로 변환할 수 있도록 프롬프트에 주입.
+  const frameworkTags = (typeof supplyIndex === 'number' && cumulativeProduction && typeof cumulativeExploreRd === 'number' && roundHistory)
+    ? matchFrameworkTags({
+        decisions, results, roundHistory,
+        brandEquity: brandEquity ?? 50,
+        supplyIndex,
+        cumulativeProduction,
+        cumulativeExploreRd,
+      }).slice(0, 5)
+    : [];
+  const frameworkLine = frameworkTags.length > 0
+    ? `[경영학 프레임워크 자동 매칭] ${frameworkTags.map((t) => `${t.label}(${t.category})`).join(' · ')}`
+    : null;
+  const frameworkDetails = frameworkTags.length > 0
+    ? frameworkTags.map((t) => `- ${t.label}: ${t.insight}`).join('\n')
+    : null;
+
   const lines: (string | null)[] = [
     `BizSim 경영 시뮬레이션 ${round}분기 결과를 플레이어에게 2-3문장으로 해설해줘.`,
     ``,
@@ -131,6 +149,7 @@ function buildRoundPrompt(body: RoundBody): string {
     `- 이벤트가 있으면 해당 이벤트가 성과에 어떻게 작용했는지 한 번 언급.`,
     `- 제안은 정확히 하나만 (여러 개 나열 금지).`,
     `- 구체적인 숫자(%, 금액, 또는 증감폭) 최소 1개를 본문에 인용.`,
+    `- "경영학 프레임워크 자동 매칭" 섹션에 이미 상황이 분류되어 있다. 그 중 가장 위에 있는 프레임워크(최고 priority) 하나를 본문에 인용.`,
     `- 해설만 한국어로 출력, 서론이나 마무리 인사 없이.`,
     ``,
     `[상황 태그] ${tags.length > 0 ? tags.join(' · ') : '특이사항 없음'}`,
@@ -141,6 +160,8 @@ function buildRoundPrompt(body: RoundBody): string {
     ansoffLine,
     queueLine,
     bcgLine,
+    frameworkLine,
+    frameworkDetails ? `\n[프레임워크 상세]\n${frameworkDetails}` : null,
     ``,
     `[우리회사 의사결정]`,
     ...decisions.products.map((p) => {

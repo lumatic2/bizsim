@@ -2,12 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { useGameStore } from '@/stores/game-store';
+import { OnboardingModal, hasSeenOnboarding } from '@/components/OnboardingModal';
 
 export default function PlayLayout({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
-    useGameStore.persist.rehydrate()?.finally(() => setHydrated(true));
+    useGameStore.persist.rehydrate()?.finally(() => {
+      setHydrated(true);
+      if (!hasSeenOnboarding()) setShowOnboarding(true);
+    });
   }, []);
 
   if (!hydrated) {
@@ -21,5 +26,10 @@ export default function PlayLayout({ children }: { children: React.ReactNode }) 
     );
   }
 
-  return <div className="px-3 sm:px-4 md:px-6 pb-8">{children}</div>;
+  return (
+    <div className="px-3 sm:px-4 md:px-6 pb-8">
+      {children}
+      {showOnboarding && <OnboardingModal onClose={() => setShowOnboarding(false)} />}
+    </div>
+  );
 }

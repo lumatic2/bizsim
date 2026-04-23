@@ -18,6 +18,7 @@ const DECISIONS: Decisions = {
   dividendPayout: 0,
   serviceCapacity: 50_000,
   headcount: { sales: 4, rd: 4 },
+  salaryMultiplier: 1.0,
 };
 
 describe('labor helpers', () => {

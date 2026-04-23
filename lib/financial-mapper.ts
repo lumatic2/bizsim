@@ -1,6 +1,6 @@
 import type { Decisions, SimulationResults, FinancialStatements, PnL, BalanceSheet, CashFlow, CarryForwardBS, RoundEvent, ProductId } from './types';
 import { CALM_EVENT } from './events';
-import { quarterlyCorporateTax, rdTaxCreditFor, applyLossCarryforward } from './tax';
+import { quarterlyCorporateTax, rdTaxCreditFor, investmentTaxCreditFor, applyLossCarryforward } from './tax';
 import { learningCurveMultiplier } from './learning-curve';
 import { SERVICE_COST_PER_UNIT } from './service-queue';
 import { laborCostOf, G_AND_A_BASELINE, MAINTENANCE_RATE } from './labor';
@@ -59,7 +59,7 @@ function generatePnL(decisions: Decisions, results: SimulationResults, event: Ro
   const prevPpe = previousBS?.ppe ?? INITIAL_PPE;
   const depreciationExpense = Math.round(prevPpe * DEPRECIATION_RATE);
   // otherExpense 분해: G&A baseline + 인건비 + 설비유지비 + 서비스 opex + 재고유지비
-  const laborCost = laborCostOf(decisions.headcount);
+  const laborCost = laborCostOf(decisions.headcount, decisions.salaryMultiplier);
   const maintenanceCost = Math.round(prevPpe * MAINTENANCE_RATE);
   const serviceCost = decisions.serviceCapacity * SERVICE_COST_PER_UNIT;
   // 기말 재고 평가: (produced - sold) × unit cost (학습곡선·공급지수·조직학습 적용)
@@ -88,7 +88,9 @@ function generatePnL(decisions: Decisions, results: SimulationResults, event: Ro
   const { taxableIncome } = applyLossCarryforward(taxBase, carryforwardLoss);
   const grossCashTax = quarterlyCorporateTax(taxableIncome);
   const rdTaxCredit = rdTaxCreditFor(rdExpense, grossCashTax);
-  const currentTax = Math.max(0, grossCashTax - rdTaxCredit);
+  const afterRd = Math.max(0, grossCashTax - rdTaxCredit);
+  const investmentTaxCredit = investmentTaxCreditFor(decisions.capexInvestment, afterRd);
+  const currentTax = Math.max(0, afterRd - investmentTaxCredit);
 
   // 이연법인세비용: 일시차이의 당기 변동분 × 유효세율 (음수이면 DTL 환입)
   const deferredTaxExpense = Math.round(depDiff * EFFECTIVE_TAX_RATE);
@@ -100,7 +102,7 @@ function generatePnL(decisions: Decisions, results: SimulationResults, event: Ro
     revenue, cogs, grossProfit, adExpense, rdExpense, depreciationExpense,
     laborCost, maintenanceCost, serviceCost, inventoryHoldingCost, otherExpense,
     operatingProfit, interestExpense, pretaxIncome,
-    currentTax, deferredTaxExpense, rdTaxCredit, incomeTax, netIncome,
+    currentTax, deferredTaxExpense, rdTaxCredit, investmentTaxCredit, incomeTax, netIncome,
   };
 }
 
@@ -114,6 +116,7 @@ function generateBS(decisions: Decisions, results: SimulationResults, pnl: PnL, 
   const prevPpe = previousBS?.ppe ?? INITIAL_PPE;
   const prevTaxPpe = previousBS?.taxPpe ?? INITIAL_PPE;
   const prevDTL = previousBS?.deferredTaxLiability ?? 0;
+  const prevDTA = previousBS?.deferredTaxAsset ?? 0;
 
   const { newDebt, newEquity } = decisions.financing;
 
@@ -133,8 +136,11 @@ function generateBS(decisions: Decisions, results: SimulationResults, pnl: PnL, 
   // 세법상 유형자산 (가속상각) — 내부 관리용 carry-forward
   const taxDepreciation = Math.round(prevTaxPpe * TAX_DEPRECIATION_RATE);
   const taxPpeNext = Math.max(0, prevTaxPpe - taxDepreciation) + decisions.capexInvestment;
-  // 이연법인세부채: 전기 DTL + 당기 이연법인세비용 (음수면 환입), 음수가 되면 DTA 영역이지만 단순화 위해 0 이상 clamp
-  const deferredTaxLiability = Math.max(0, prevDTL + pnl.deferredTaxExpense);
+  // 이연법인세부채/자산 분리: 누적 차이 순효과 = (prevDTL - prevDTA) + 당기 이연법인세비용.
+  // 양수면 DTL, 음수면 DTA로 재분류.
+  const netTempDiffEffect = prevDTL - prevDTA + pnl.deferredTaxExpense;
+  const deferredTaxLiability = Math.max(0, netTempDiffEffect);
+  const deferredTaxAsset = Math.max(0, -netTempDiffEffect);
 
   // 배당은 generateFinancials에서 이미 배당가능이익 한도로 clamp된 값이 전달됨
 
@@ -146,9 +152,9 @@ function generateBS(decisions: Decisions, results: SimulationResults, pnl: PnL, 
   const cashFromOps = pnl.netIncome + pnl.depreciationExpense - receivables - inventory - prevTaxPayable + pnl.incomeTax;
   const cash = prevCash + cashFromOps - decisions.capexInvestment + newDebt + newEquity - dividendPaid;
 
-  const totalAssets = cash + receivables + inventory + ppe;
+  const totalAssets = cash + receivables + inventory + ppe + deferredTaxAsset;
   const payables = Math.round(pnl.cogs * 0.1);
-  // 미지급법인세는 현금 기준(이연세 제외). 이연법인세는 별도 DTL 항목으로 계상.
+  // 미지급법인세는 현금 기준(이연세 제외). 이연법인세는 별도 DTL/DTA 항목으로 계상.
   const taxPayable = pnl.currentTax;
 
   const debt = prevDebt + newDebt;
@@ -160,7 +166,7 @@ function generateBS(decisions: Decisions, results: SimulationResults, pnl: PnL, 
 
   return {
     cash, receivables, inventory, ppe, taxPpe: taxPpeNext, totalAssets,
-    payables, taxPayable, deferredTaxLiability,
+    payables, taxPayable, deferredTaxLiability, deferredTaxAsset,
     debt, equity, capitalSurplus, retainedEarnings, totalLiabilities,
   };
 }

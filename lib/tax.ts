@@ -47,6 +47,27 @@ export function rdTaxCreditFor(rdExpense: number, grossTax: number): number {
   return Math.max(0, Math.round(Math.min(credit, cap)));
 }
 
+/**
+ * 투자세액공제 — 조세특례제한법 §24 (통합투자세액공제 중소기업 일반 7% 가정).
+ * CAPEX의 7%를 산출세액에서 공제. R&D 공제와 합산하여 산출세액의 70% 한도 (단순화).
+ */
+export const INVESTMENT_TAX_CREDIT_RATE = 0.07;
+
+export function investmentTaxCreditFor(capexInvestment: number, grossTaxAfterRd: number): number {
+  const credit = capexInvestment * INVESTMENT_TAX_CREDIT_RATE;
+  const cap = grossTaxAfterRd * 0.7;
+  return Math.max(0, Math.round(Math.min(credit, cap)));
+}
+
+/** 이월결손금 15년 한도 (게임 단순화: 1라운드 = 1분기 → 60분기). 만료된 loss는 제거. */
+export const LOSS_CARRYFORWARD_QUARTERS = 60;
+
+export type LossLot = { round: number; amount: number };
+
+export function expireOldLosses(history: LossLot[], currentRound: number): LossLot[] {
+  return history.filter((lot) => currentRound - lot.round <= LOSS_CARRYFORWARD_QUARTERS);
+}
+
 /** 이월결손금 공제 후 과세표준 계산. 당해 공제 사용분을 함께 반환. */
 export function applyLossCarryforward(pretaxIncome: number, carryforwardLoss: number): { taxableIncome: number; usedLoss: number } {
   if (pretaxIncome <= 0) return { taxableIncome: 0, usedLoss: 0 };

@@ -67,6 +67,7 @@ export default function FinancialsPage() {
     { label: '  ↳ 당기 현금 법인세', value: -pnl.currentTax },
     { label: '  ↳ 이연법인세비용', value: -pnl.deferredTaxExpense },
     { label: '  ↳ R&D 세액공제 반영', value: pnl.rdTaxCredit },
+    { label: '  ↳ 투자세액공제 반영', value: pnl.investmentTaxCredit },
     { label: '당기순이익', value: pnl.netIncome, isTotal: true },
   ];
 
@@ -76,6 +77,7 @@ export default function FinancialsPage() {
     { label: '매출채권', value: bs.receivables },
     { label: '재고자산', value: bs.inventory },
     { label: '유형자산(순액)', value: bs.ppe },
+    { label: '이연법인세자산', value: bs.deferredTaxAsset },
     { label: '총자산', value: bs.totalAssets, isTotal: true },
     { label: '부채', value: 0, isHeader: true },
     { label: '매입채무', value: bs.payables },

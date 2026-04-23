@@ -8,7 +8,7 @@ import { CALM_EVENT, rollEvent } from '@/lib/events';
 import { DEFAULT_SUPPLY_INDEX, rollSupplyIndex } from '@/lib/supply';
 import { DEFAULT_RD_ALLOCATION, exploreBoostFrom } from '@/lib/ansoff';
 import { combineAdstock, EMPTY_ADSTOCK } from '@/lib/adstock';
-import { DEFAULT_HEADCOUNT, rdEffectivenessMultiplier } from '@/lib/labor';
+import { DEFAULT_HEADCOUNT, DEFAULT_SALARY_MULTIPLIER, rdEffectivenessMultiplier, applyAttrition } from '@/lib/labor';
 import { playerDemandVolatility, bullwhipExcess, bullwhipSupplyDrift, bullwhipCompetitorAmp } from '@/lib/bullwhip';
 
 const DEFAULT_DECISIONS: Decisions = {
@@ -25,6 +25,7 @@ const DEFAULT_DECISIONS: Decisions = {
   dividendPayout: 0,
   serviceCapacity: 20_000,  // 분기 서비스 처리 능력 — 초기 unitsSold 범위 커버
   headcount: { ...DEFAULT_HEADCOUNT },
+  salaryMultiplier: DEFAULT_SALARY_MULTIPLIER,
 };
 
 type GameActions = {
@@ -70,6 +71,7 @@ const initialState: GameState = {
   // 생산 리드타임: R1 시작 시 "이미 만들어둔" 기초 재고 (초기 default production과 동일하게 세팅 — 기존 즉시생산 밸런스 유지)
   pendingProduction: { A: 8_000, B: 7_000 },
   adstock: EMPTY_ADSTOCK,
+  lastAttrition: { sales: 0, rd: 0 },
 };
 
 export const useGameStore = create<GameState & GameActions>()(
@@ -158,6 +160,7 @@ export const useGameStore = create<GameState & GameActions>()(
       ppe: bs.ppe,
       taxPpe: bs.taxPpe,
       deferredTaxLiability: bs.deferredTaxLiability,
+      deferredTaxAsset: bs.deferredTaxAsset,
     };
     const nextRound = s.currentRound + 1;
     // 플레이어 상대점유율: 우리 점유율 ÷ 최대 경쟁사 점유율. > 1 이면 BCG Star/Cash Cow 영역.
@@ -227,6 +230,9 @@ export const useGameStore = create<GameState & GameActions>()(
     // 이 값이 다음 분기의 "prevAdstock"으로 들어감 (다시 λ 곱해져 추가 carryover)
     const newAdstock = combineAdstock(s.decisions.adBudget, s.adstock);
 
+    // 이직률 적용: salaryMultiplier < 1.0 일 때 headcount 자연 감소 (부서별 floor 1명)
+    const { headcount: newHeadcount, attrition } = applyAttrition(s.decisions.headcount, s.decisions.salaryMultiplier);
+
     return {
       roundHistory: [...s.roundHistory, snapshot],
       currentRound: nextRound,
@@ -248,6 +254,11 @@ export const useGameStore = create<GameState & GameActions>()(
       cumulativeExploreRd: newCumulativeExploreRd,
       pendingProduction: newPendingProduction,
       adstock: newAdstock,
+      lastAttrition: attrition,
+      decisions: {
+        ...s.decisions,
+        headcount: newHeadcount,
+      },
     };
   }),
 
@@ -255,12 +266,12 @@ export const useGameStore = create<GameState & GameActions>()(
     }),
     {
       name: 'bizsim-game',
-      version: 14,
+      version: 16,
       skipHydration: true,
       storage: createJSONStorage(() => localStorage),
       migrate: (persisted: unknown, version: number) => {
-        // v14: Phase H 1단계 — decisions.headcount + PnL 인건비/유지비/서비스비 분해. 이전 버전 리셋.
-        if (version < 14) {
+        // v16: 이직률 모델 — decisions.salaryMultiplier + lastAttrition 추가. 이전 버전 리셋.
+        if (version < 16) {
           return initialState;
         }
         return persisted;
@@ -290,6 +301,7 @@ export const useGameStore = create<GameState & GameActions>()(
         cumulativeExploreRd: state.cumulativeExploreRd,
         pendingProduction: state.pendingProduction,
         adstock: state.adstock,
+        lastAttrition: state.lastAttrition,
       }),
     },
   ),

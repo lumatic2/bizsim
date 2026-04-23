@@ -17,6 +17,7 @@ export const LABOR_COST_PER_HEAD = 25_000_000;
 export const MAINTENANCE_RATE = 0.005;
 export const G_AND_A_BASELINE = 50_000_000;
 export const DEFAULT_HEADCOUNT = { sales: 4, rd: 4 } as const;
+export const DEFAULT_SALARY_MULTIPLIER = 1.0;
 
 export function directChannelMultiplier(salesHeadcount: number): number {
   return 0.8 + salesHeadcount * 0.05;
@@ -26,6 +27,27 @@ export function rdEffectivenessMultiplier(rdHeadcount: number): number {
   return 0.8 + rdHeadcount * 0.05;
 }
 
-export function laborCostOf(headcount: { sales: number; rd: number }): number {
-  return (headcount.sales + headcount.rd) * LABOR_COST_PER_HEAD;
+export function laborCostOf(headcount: { sales: number; rd: number }, salaryMultiplier: number = 1): number {
+  return (headcount.sales + headcount.rd) * LABOR_COST_PER_HEAD * salaryMultiplier;
+}
+
+// 이직률 (자연 감소율). salaryMultiplier < 1 일 때 증가.
+// multiplier 1.0 → 0%, 0.8 → 4%, 0.6 → 8%, 0.7 → 6%. 상한 20% (심각한 저임금).
+export function attritionRate(salaryMultiplier: number): number {
+  if (salaryMultiplier >= 1.0) return 0;
+  return Math.min(0.2, (1.0 - salaryMultiplier) * 0.2);
+}
+
+// 이탈 적용 후 headcount (각 부서 최소 1명 floor).
+export function applyAttrition(headcount: { sales: number; rd: number }, salaryMultiplier: number): {
+  headcount: { sales: number; rd: number };
+  attrition: { sales: number; rd: number };
+} {
+  const rate = attritionRate(salaryMultiplier);
+  const newSales = Math.max(1, Math.floor(headcount.sales * (1 - rate)));
+  const newRd = Math.max(1, Math.floor(headcount.rd * (1 - rate)));
+  return {
+    headcount: { sales: newSales, rd: newRd },
+    attrition: { sales: headcount.sales - newSales, rd: headcount.rd - newRd },
+  };
 }

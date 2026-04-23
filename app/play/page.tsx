@@ -10,7 +10,7 @@ import { INITIAL_PPE, productionCapacityFrom } from '@/lib/financial-mapper';
 import { learningCurveMultiplier } from '@/lib/learning-curve';
 import { classifyPressure, PRESSURE_LABELS } from '@/lib/supply';
 import { exploreBoostFrom } from '@/lib/ansoff';
-import { LABOR_COST_PER_HEAD, directChannelMultiplier, rdEffectivenessMultiplier } from '@/lib/labor';
+import { LABOR_COST_PER_HEAD, directChannelMultiplier, rdEffectivenessMultiplier, attritionRate } from '@/lib/labor';
 import { economicOrderQuantity } from '@/lib/eoq';
 import { playerDemandVolatility, BULLWHIP_THRESHOLD } from '@/lib/bullwhip';
 import { orgLearningMultiplier } from '@/lib/org-learning';
@@ -51,7 +51,7 @@ export default function DecisionPage() {
     currentRound, competitors, qualityCap, resetGame, roundHistory,
     currentEvent, brandEquity, cumulativeLoss, previousBS,
     cumulativeProduction, supplyIndex, cumulativeExploreRd, cumulativeImproveRd,
-    pendingProduction, adstock,
+    pendingProduction, adstock, lastAttrition,
   } = useGameStore();
   const [activeProduct, setActiveProduct] = useState<ProductId>('A');
   const [activeTab, setActiveTab] = useState<TabId>('product');
@@ -109,7 +109,8 @@ export default function DecisionPage() {
     0,
   );
   const serviceOpex = decisions.serviceCapacity * 50_000;
-  const laborCost = (decisions.headcount.sales + decisions.headcount.rd) * LABOR_COST_PER_HEAD;
+  const laborCost = (decisions.headcount.sales + decisions.headcount.rd) * LABOR_COST_PER_HEAD * decisions.salaryMultiplier;
+  const projectedAttrition = attritionRate(decisions.salaryMultiplier);
   const totalCost = totalAd + decisions.rdBudget / 4 + totalProductionCost + 50_000_000 + laborCost + serviceOpex;
 
   // Bullwhip 경고: 이번 preview.unitsSold vs 직전 분기 unitsSold 변동률 계산
@@ -570,10 +571,42 @@ export default function DecisionPage() {
                 <div className="flex items-center justify-between">
                   <div className="text-xs" style={{ color: 'var(--biz-text-muted)' }}>
                     인력 편성 (영업·R&D)
-                    <span className="ml-2 text-[10px] opacity-75">1인당 ₩{(LABOR_COST_PER_HEAD / 1_000_000).toFixed(0)}M/분기</span>
+                    <span className="ml-2 text-[10px] opacity-75">1인당 ₩{(LABOR_COST_PER_HEAD / 1_000_000).toFixed(0)}M × 급여배수/분기</span>
                   </div>
                   <div className="text-xs font-mono" style={{ color: 'var(--biz-text)' }}>
                     총 {decisions.headcount.sales + decisions.headcount.rd}명 · ₩{formatBillion(laborCost)}B/분기
+                  </div>
+                </div>
+                {(lastAttrition.sales + lastAttrition.rd) > 0 && (
+                  <div className="text-[11px] px-2 py-1 rounded" style={{ background: '#fef2f2', color: '#b91c1c' }}>
+                    ⚠ 지난 분기 저임금으로 {lastAttrition.sales + lastAttrition.rd}명 이탈 (영업 {lastAttrition.sales} / R&D {lastAttrition.rd})
+                  </div>
+                )}
+                <div>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span style={{ color: 'var(--biz-text-muted)' }}>
+                      급여 수준 (업계평균 대비)
+                      {projectedAttrition > 0 && (
+                        <span className="ml-2 text-[10px]" style={{ color: '#b91c1c' }}>
+                          예상 이탈률 {(projectedAttrition * 100).toFixed(0)}%
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-mono" style={{ color: 'var(--biz-text)' }}>×{decisions.salaryMultiplier.toFixed(2)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.7}
+                    max={1.5}
+                    step={0.05}
+                    value={decisions.salaryMultiplier}
+                    onChange={(e) => setDecisions({ salaryMultiplier: Number(e.target.value) })}
+                    className="w-full accent-gray-900"
+                  />
+                  <div className="flex items-center justify-between text-[10px] mt-0.5" style={{ color: 'var(--biz-text-muted)' }}>
+                    <span>0.7 (이탈 위험)</span>
+                    <span>1.0 업계평균</span>
+                    <span>1.5 (인건비 부담)</span>
                   </div>
                 </div>
                 <div>

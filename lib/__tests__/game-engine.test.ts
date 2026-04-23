@@ -18,6 +18,7 @@ const DEFAULT_DECISIONS: Decisions = {
   dividendPayout: 0,
   serviceCapacity: 20_000,
   headcount: { sales: 4, rd: 4 },
+  salaryMultiplier: 1.0,
 };
 
 function withProducts(base: Decisions, products: [ProductDecision, ProductDecision]): Decisions {
@@ -103,6 +104,7 @@ describe('runSimulation', () => {
       dividendPayout: 0,
       serviceCapacity: 20_000,
       headcount: { sales: 4, rd: 4 },
+  salaryMultiplier: 1.0,
     };
     const result = runSimulation(extreme, INITIAL_COMPETITORS, marketSize, qualityCap);
     for (const demand of Object.values(result.segmentDemand)) {

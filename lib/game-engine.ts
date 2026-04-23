@@ -193,7 +193,7 @@ export function runSimulation(
 
   // 공통간접비 매출 비중 배분: 광고·R&D·일반관리비·인건비·서비스 opex 합계를 제품 매출 비율로 나눔.
   // 감가상각·이자·유지비는 financial-mapper에서 정식 반영. 여기서는 runtime overhead 근사치만.
-  const runtimeLabor = laborCostOf(decisions.headcount);
+  const runtimeLabor = laborCostOf(decisions.headcount, decisions.salaryMultiplier);
   const runtimeService = decisions.serviceCapacity * SERVICE_COST_PER_UNIT;
   const runtimeOverhead = totalAd + decisions.rdBudget / 4 + G_AND_A_BASELINE + runtimeLabor + runtimeService;
   for (const id of ['A', 'B'] as ProductId[]) {
@@ -222,7 +222,7 @@ export function runSimulation(
 
   const grossProfit = totalRevenue - totalCogs;
   const serviceCost = decisions.serviceCapacity * SERVICE_COST_PER_UNIT;
-  const laborCost = laborCostOf(decisions.headcount);
+  const laborCost = laborCostOf(decisions.headcount, decisions.salaryMultiplier);
   // game-engine의 operatingProfit은 프리뷰 용도 — 감가·유지·이자는 financial-mapper에서 정식 계산.
   // 여기서는 G&A baseline + laborCost + serviceCost만 차감 (runtime overhead와 일치).
   const operatingProfit = grossProfit - totalAd - decisions.rdBudget / 4 - G_AND_A_BASELINE - laborCost - serviceCost;

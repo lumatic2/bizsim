@@ -582,10 +582,23 @@ function CompetitorProfiles({ results, roundHistory }: { results: SimulationResu
           const latest = results.competitors[i];
           return (
             <div key={t.name} className="border rounded p-3" style={{ borderColor: 'var(--biz-border)' }}>
-              <div className="flex items-baseline justify-between mb-2">
+              <div className="flex items-baseline justify-between mb-1">
                 <span className="text-sm font-semibold" style={{ color: 'var(--biz-text)' }}>{t.name}</span>
                 <span className="text-[11px] font-mono" style={{ color: 'var(--biz-text)' }}>{latest.marketShare}%</span>
               </div>
+              {latest.archetype && (
+                <div className="mb-2" title={`${latest.archetype.summary}\n\n강점: ${latest.archetype.strengths}\n\n플레이북: ${latest.archetype.playbook}`}>
+                  <span
+                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                    style={{ background: 'var(--biz-primary-light)', color: 'var(--biz-primary)' }}
+                  >
+                    {latest.archetype.label}
+                  </span>
+                  <div className="text-[10px] mt-1" style={{ color: 'var(--biz-text-muted)' }}>
+                    {latest.archetype.summary}
+                  </div>
+                </div>
+              )}
               <div className="flex flex-wrap gap-1 mb-2">
                 {t.tags.map((tag) => (
                   <span
