@@ -56,13 +56,14 @@ export type CompetitorUpdateContext = {
   playerShare: number;
   playerRelativeShare: number; // 플레이어 전체 점유율 / 최대 경쟁사 점유율. > 1 이면 플레이어가 리더.
   supplyIndex: number;         // 공급자 교섭력 지수 — 경쟁사도 동일 공급망 노출 가정
+  bullwhipAmp: number;         // 플레이어 수요 변동성 초과분 (0 이상). 경쟁사 광고 증가율에 가산.
 };
 
 export function updateCompetitorDecisions(
   competitors: CompetitorState[],
   context: CompetitorUpdateContext,
 ): CompetitorState[] {
-  const { playerShare, playerRelativeShare, supplyIndex } = context;
+  const { playerShare, playerRelativeShare, supplyIndex, bullwhipAmp } = context;
   const playerIsLeader = playerRelativeShare > 1.0;
 
   return competitors.map((c, i) => {
@@ -91,6 +92,12 @@ export function updateCompetitorDecisions(
     // 기존 규칙: 플레이어 전체 점유율이 25% 이상이면 추가 +10% (Star 중첩 가능)
     if (playerShare > 25) {
       adBudget = Math.round(adBudget * 1.1);
+    }
+
+    // Bullwhip 증폭: 플레이어 수요 급변 → 경쟁사 광고 과잉 반응 (hog cycle)
+    // bullwhipAmp 0.2 (변동 40% = 초과 20%) → 광고 +20%
+    if (bullwhipAmp > 0) {
+      adBudget = Math.round(adBudget * (1 + bullwhipAmp));
     }
 
     // 성향별 세부 반응

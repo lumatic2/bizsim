@@ -8,6 +8,8 @@ import { AIDebrief } from '@/components/AIDebrief';
 import { PERSONAS } from '@/lib/personas';
 import { computeBCGPositions } from '@/lib/bcg';
 import { computeCLV } from '@/lib/clv';
+import { computeDelta, topAttribution } from '@/lib/round-delta';
+import { analyzeCompetitor } from '@/lib/competitor-trend';
 import type { SimulationResults, Decisions, RoundSnapshot } from '@/lib/types';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea, ResponsiveContainer, ZAxis } from 'recharts';
 
@@ -66,6 +68,18 @@ export default function ResultsPage() {
         />
         <MetricCard label="고객 만족도" value={`${results.satisfaction}`} delta="/100" deltaUp={results.satisfaction > 50} />
       </div>
+
+      {/* 라운드 간 변화 카드 */}
+      {previousResults && (
+        <RoundChangeCard
+          cur={results}
+          prev={previousResults}
+          curDecisions={decisions}
+          prevDecisions={roundHistory[roundHistory.length - 1]!.decisions}
+          curEvent={currentEvent}
+          supplyIndexDelta={supplyIndex - (roundHistory[roundHistory.length - 1]?.supplyIndex ?? supplyIndex)}
+        />
+      )}
 
       {/* CLV 대시보드 */}
       <CLVCard results={results} brandEquity={brandEquity} />
@@ -194,6 +208,9 @@ export default function ResultsPage() {
           </ScatterChart>
         </ResponsiveContainer>
       </div>
+
+      {/* 경쟁사 프로파일 드릴다운 — 전략 추이 + 태그 */}
+      <CompetitorProfiles results={results} roundHistory={roundHistory} />
 
       {/* 경쟁사 인텔리전스 */}
       <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 mb-6">
@@ -326,6 +343,145 @@ export default function ResultsPage() {
         >
           재무제표 보기 →
         </button>
+      </div>
+    </div>
+  );
+}
+
+function CompetitorProfiles({ results, roundHistory }: { results: SimulationResults; roundHistory: RoundSnapshot[] }) {
+  const trends = useMemo(
+    () => results.competitors.map((c) => analyzeCompetitor(c.name, roundHistory, c)),
+    [results.competitors, roundHistory],
+  );
+  if (roundHistory.length === 0) return null;
+
+  return (
+    <div className="border rounded-lg p-4 mb-6" style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }}>
+      <div className="flex items-baseline justify-between mb-3">
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--biz-text)' }}>경쟁사 프로파일 드릴다운</h3>
+        <span className="text-[11px]" style={{ color: 'var(--biz-text-muted)' }}>라운드 추이 + 전략 태그</span>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        {trends.map((t, i) => {
+          const latest = results.competitors[i];
+          return (
+            <div key={t.name} className="border rounded p-3" style={{ borderColor: 'var(--biz-border)' }}>
+              <div className="flex items-baseline justify-between mb-2">
+                <span className="text-sm font-semibold" style={{ color: 'var(--biz-text)' }}>{t.name}</span>
+                <span className="text-[11px] font-mono" style={{ color: 'var(--biz-text)' }}>{latest.marketShare}%</span>
+              </div>
+              <div className="flex flex-wrap gap-1 mb-2">
+                {t.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="text-[10px] px-1.5 py-0.5 rounded"
+                    style={{
+                      background: tag === '공격적 가격전략' || tag === '광고 공세' ? '#fef2f2'
+                        : tag === '품질 추격' || tag === '점유율 상승' ? '#fff7ed'
+                        : tag === '수비 전환' ? '#eff6ff'
+                        : 'var(--biz-primary-light)',
+                      color: tag === '공격적 가격전략' || tag === '광고 공세' ? '#b91c1c'
+                        : tag === '품질 추격' || tag === '점유율 상승' ? '#b45309'
+                        : tag === '수비 전환' ? '#1d4ed8'
+                        : 'var(--biz-text-muted)',
+                    }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[10px]" style={{ color: 'var(--biz-text-muted)' }}>
+                <Sparkline label="가격" series={t.priceSeries} format={(v) => `${(v / 10_000).toFixed(0)}만`} />
+                <Sparkline label="품질" series={t.qualitySeries} format={(v) => v.toFixed(1)} />
+                <Sparkline label="광고" series={t.adSeries} format={(v) => `${(v / 1_000_000_000).toFixed(1)}B`} />
+                <Sparkline label="점유" series={t.shareSeries} format={(v) => `${v.toFixed(1)}%`} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Sparkline({ label, series, format }: { label: string; series: number[]; format: (v: number) => string }) {
+  if (series.length === 0) return null;
+  const width = 60;
+  const height = 16;
+  const min = Math.min(...series);
+  const max = Math.max(...series);
+  const range = max - min || 1;
+  const points = series.map((v, i) => {
+    const x = (i / Math.max(1, series.length - 1)) * width;
+    const y = height - ((v - min) / range) * height;
+    return `${x},${y}`;
+  }).join(' ');
+  const last = series[series.length - 1];
+  const first = series[0];
+  const direction = last - first;
+  const color = direction > 0 ? '#047857' : direction < 0 ? '#b91c1c' : 'var(--biz-text-muted)';
+
+  return (
+    <div className="flex items-center justify-between gap-1">
+      <span className="whitespace-nowrap">{label}</span>
+      <svg width={width} height={height} style={{ flexShrink: 0 }}>
+        <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} />
+      </svg>
+      <span className="font-mono" style={{ color: 'var(--biz-text)' }}>{format(last)}</span>
+    </div>
+  );
+}
+
+type RoundChangeCardProps = {
+  cur: SimulationResults;
+  prev: SimulationResults;
+  curDecisions: Decisions;
+  prevDecisions: Decisions;
+  curEvent: import('@/lib/types').RoundEvent;
+  supplyIndexDelta: number;
+};
+
+function RoundChangeCard({ cur, prev, curDecisions, prevDecisions, curEvent, supplyIndexDelta }: RoundChangeCardProps) {
+  const d = useMemo(() => computeDelta(cur, prev), [cur, prev]);
+  const attribution = useMemo(
+    () => topAttribution(curDecisions, prevDecisions, curEvent, supplyIndexDelta),
+    [curDecisions, prevDecisions, curEvent, supplyIndexDelta],
+  );
+
+  const Item = ({ label, value, digits = 1, suffix = '' }: { label: string; value: number; digits?: number; suffix?: string }) => {
+    const color = value > 0.001 ? '#047857' : value < -0.001 ? '#b91c1c' : 'var(--biz-text-muted)';
+    const sign = value > 0 ? '+' : '';
+    return (
+      <div className="flex flex-col items-center px-3 py-2 border rounded" style={{ borderColor: 'var(--biz-border)' }}>
+        <span className="text-[10px]" style={{ color: 'var(--biz-text-muted)' }}>{label}</span>
+        <span className="text-sm font-mono font-semibold" style={{ color }}>{sign}{value.toFixed(digits)}{suffix}</span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="border rounded-lg p-4 mb-4" style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }}>
+      <div className="flex items-baseline justify-between mb-2">
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--biz-text)' }}>이전 분기 대비 변화</h3>
+        {attribution && (
+          <span
+            className="text-[11px] px-2 py-0.5 rounded border"
+            style={{
+              borderColor: 'var(--biz-border)',
+              background: attribution.impact === 'up' ? '#ecfdf5' : attribution.impact === 'down' ? '#fef2f2' : 'var(--biz-card)',
+              color: attribution.impact === 'up' ? '#047857' : attribution.impact === 'down' ? '#b91c1c' : 'var(--biz-text-muted)',
+            }}
+          >
+            주요 변수: {attribution.label}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-5 gap-2">
+        <Item label="점유율" value={d.marketShare} digits={1} suffix="%p" />
+        <Item label="매출" value={d.revenueB} digits={1} suffix="B" />
+        <Item label="영업이익" value={d.operatingProfitB} digits={1} suffix="B" />
+        <Item label="만족도" value={d.satisfaction} digits={0} />
+        <Item label="판매" value={d.unitsSold} digits={0} suffix="대" />
       </div>
     </div>
   );

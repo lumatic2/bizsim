@@ -1,8 +1,10 @@
-import type { Decisions, SimulationResults, PersonaId, CompetitorState, RoundEvent, ProductDecision, ProductResult, ProductId } from './types';
+import type { Decisions, SimulationResults, PersonaId, CompetitorState, RoundEvent, ProductDecision, ProductResult, ProductId, AdMix } from './types';
 import { PERSONAS } from './personas';
 import { CALM_EVENT } from './events';
 import { learningCurveMultiplier } from './learning-curve';
 import { serviceQueueImpact, SERVICE_COST_PER_UNIT } from './service-queue';
+import { combineAdstock, EMPTY_ADSTOCK } from './adstock';
+import { directChannelMultiplier, laborCostOf, G_AND_A_BASELINE, MAINTENANCE_RATE } from './labor';
 
 const BASE_PRICE = 349_000;
 const BASE_QUALITY = 3;
@@ -81,6 +83,7 @@ export function runSimulation(
     A: decisions.products[0].production,
     B: decisions.products[1].production,
   },
+  prevAdstock: AdMix = EMPTY_ADSTOCK,
 ): SimulationResults {
   const effects = event.effects;
   const effectiveMarketSize = Math.round(marketSize * (effects.marketSizeMultiplier ?? 1));
@@ -98,6 +101,16 @@ export function runSimulation(
     ? productionCapacity / requestedProduction
     : 1;
 
+  // Adstock (광고 carryover) 적용: 수요 계산에 쓰이는 유효 광고 = 현재 예산 + λ×전분기 스톡
+  const effectiveAdBudget = combineAdstock(decisions.adBudget, prevAdstock);
+  // 영업팀 규모 효과: 직영 채널 실효 비중을 headcount 배수로 조정 (baseline 4명 = ×1.0)
+  const directBoost = directChannelMultiplier(decisions.headcount.sales);
+  const adjustedChannels = {
+    online: decisions.channels.online,
+    mart: decisions.channels.mart,
+    direct: decisions.channels.direct * directBoost,
+  };
+  // totalAd는 재무·UI용 이번 분기 실제 현금 지출 — carryover 아님 (현금 지출은 decisions.adBudget 원본)
   const totalAd = decisions.adBudget.search + decisions.adBudget.display + decisions.adBudget.influencer;
 
   // 제품별 수요 계산. 캐니벌라이제이션은 단순화 (제품 A, B 독립 집계).
@@ -114,8 +127,8 @@ export function runSimulation(
     const demandInput: DemandInput = {
       price: product.price,
       quality: effectiveQuality,
-      adBudget: decisions.adBudget,
-      channels: decisions.channels,
+      adBudget: effectiveAdBudget,
+      channels: adjustedChannels,
     };
 
     const sd = calculateSegmentDemand(demandInput, playerMarketSize, martPenalty, brandEquity);
@@ -175,10 +188,11 @@ export function runSimulation(
     totalCogs = perProduct.A.cogs + perProduct.B.cogs;
   }
 
-  // 공통간접비 매출 비중 배분: 광고·R&D·감가상각·일반관리비·이자비용 합계를 제품 매출 비율로 나눔.
-  // 감가상각과 이자는 이 시점엔 아직 모름 → financial-mapper에서 다시 덮어씀. 여기서는 판매단계 OH만 배분.
-  // 단순화: 여기서는 광고비 + R&D + otherExpense(고정 100M)만 배분. 감가/이자/세금은 PnL 확정 후.
-  const runtimeOverhead = totalAd + decisions.rdBudget / 4 + 100_000_000;
+  // 공통간접비 매출 비중 배분: 광고·R&D·일반관리비·인건비·서비스 opex 합계를 제품 매출 비율로 나눔.
+  // 감가상각·이자·유지비는 financial-mapper에서 정식 반영. 여기서는 runtime overhead 근사치만.
+  const runtimeLabor = laborCostOf(decisions.headcount);
+  const runtimeService = decisions.serviceCapacity * SERVICE_COST_PER_UNIT;
+  const runtimeOverhead = totalAd + decisions.rdBudget / 4 + G_AND_A_BASELINE + runtimeLabor + runtimeService;
   for (const id of ['A', 'B'] as ProductId[]) {
     const pr = perProduct[id];
     const share = totalRevenue > 0 ? pr.revenue / totalRevenue : 0.5;
@@ -205,7 +219,10 @@ export function runSimulation(
 
   const grossProfit = totalRevenue - totalCogs;
   const serviceCost = decisions.serviceCapacity * SERVICE_COST_PER_UNIT;
-  const operatingProfit = grossProfit - totalAd - decisions.rdBudget / 4 - 100_000_000 - serviceCost;
+  const laborCost = laborCostOf(decisions.headcount);
+  // game-engine의 operatingProfit은 프리뷰 용도 — 감가·유지·이자는 financial-mapper에서 정식 계산.
+  // 여기서는 G&A baseline + laborCost + serviceCost만 차감 (runtime overhead와 일치).
+  const operatingProfit = grossProfit - totalAd - decisions.rdBudget / 4 - G_AND_A_BASELINE - laborCost - serviceCost;
 
   const avgSatisfaction = weightedUnits > 0 ? weightedSatisfaction / weightedUnits : 0;
   const satisfaction = Math.round(clamp(

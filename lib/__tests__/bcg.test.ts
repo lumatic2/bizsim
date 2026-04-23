@@ -15,6 +15,7 @@ const DECISIONS: Decisions = {
   capexInvestment: 0,
   dividendPayout: 0,
   serviceCapacity: 20_000,
+  headcount: { sales: 4, rd: 4 },
 };
 
 function mockResults(overrides: Partial<SimulationResults> = {}): SimulationResults {

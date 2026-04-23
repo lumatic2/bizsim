@@ -17,6 +17,7 @@ const DECISIONS: Decisions = {
   capexInvestment: 0,
   dividendPayout: 0,
   serviceCapacity: 20_000,
+  headcount: { sales: 4, rd: 4 },
 };
 
 describe('serviceQueueImpact', () => {
@@ -93,14 +94,15 @@ describe('financial-mapper — serviceCost가 otherExpense에 가산', () => {
   const marketSize = getMarketSize(1);
   const qualityCap = 3;
 
-  it('serviceCapacity 증가 → otherExpense 증가', () => {
+  it('serviceCapacity 증가 → serviceCost 증가 (otherExpense 하위 항목)', () => {
     const small: Decisions = { ...DECISIONS, serviceCapacity: 10_000 };
     const big: Decisions = { ...DECISIONS, serviceCapacity: 30_000 };
     const rSmall = runSimulation(small, INITIAL_COMPETITORS, marketSize, qualityCap);
     const rBig = runSimulation(big, INITIAL_COMPETITORS, marketSize, qualityCap);
     const fSmall = generateFinancials(small, rSmall, null);
     const fBig = generateFinancials(big, rBig, null);
-    const delta = fBig.pnl.otherExpense - fSmall.pnl.otherExpense;
+    // serviceCost 필드만 직접 비교 (otherExpense는 재고유지비 등 다른 변동항 포함)
+    const delta = fBig.pnl.serviceCost - fSmall.pnl.serviceCost;
     expect(delta).toBe(20_000 * SERVICE_COST_PER_UNIT);
   });
 });

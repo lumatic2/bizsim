@@ -16,6 +16,7 @@ const DECISIONS: Decisions = {
   capexInvestment: 0,
   dividendPayout: 0,
   serviceCapacity: 50_000,  // 서비스 overflow 제거로 순수 리드타임 효과 관찰
+  headcount: { sales: 4, rd: 4 },
 };
 
 describe('runSimulation — 생산 리드타임', () => {

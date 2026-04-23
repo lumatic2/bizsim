@@ -27,10 +27,11 @@ const MAX_SPI = 1.3;
 export function rollSupplyIndex(
   prevIndex: number,
   rng: () => number = Math.random,
+  extraDrift: number = 0,  // Bullwhip 등 외생 변동성에 의한 추가 drift
 ): number {
   const shock = (rng() * 2 - 1) * SHOCK_MAGNITUDE;
   const revert = MEAN_REVERT_STRENGTH * (DEFAULT_SUPPLY_INDEX - prevIndex);
-  const next = prevIndex + revert + shock + STRUCTURAL_DRIFT;
+  const next = prevIndex + revert + shock + STRUCTURAL_DRIFT + extraDrift;
   return Math.max(MIN_SPI, Math.min(MAX_SPI, next));
 }
 

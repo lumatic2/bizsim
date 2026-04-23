@@ -1,6 +1,6 @@
 # BizSim Roadmap
 
-마지막 업데이트: 2026-04-24 (2)
+마지막 업데이트: 2026-04-24 (3)
 정체성: **경영학 이론 기반 심화 시뮬**로서의 완성도 우선 (2026-04-23 재전환, 직전 "포트폴리오·배포 우선" 노선 대체)
 비전: 재무·세무회계, 전략론(Porter/BCG/Ansoff), 운영관리(Queueing/EOQ), 고급 마케팅, 조직경제학이 실제 레버·동학으로 녹아있는 시뮬레이션
 
@@ -19,17 +19,21 @@
 - v2.0 엔진 심화 Phase A/B/C `8842731` (2026-04-23): 이벤트 카드 6종·브랜드 에쿼티 stock·마케팅 믹스 3채널·자본 조달(부채/증자)·제품 라인 2개(A/B)
 - Phase D 재무·세무회계 완성 (2026-04-23): 법인세·R&D 세액공제·CAPEX·결손금 이월 + 배당·이연법인세·원가배분
 - Phase E 전략론 완성 (2026-04-24): 학습곡선·BCG·포터 공급자·경쟁강도·Ansoff
+- Phase F 운영관리 완성 (2026-04-24): 서비스큐·생산리드타임·EOQ·Bullwhip
+- Phase G 부분 (2026-04-24): CLV·Adstock (STP는 미착수)
+- Phase H 부분 (2026-04-24): 인력 레버·otherExpense 분해 (학습효과는 미착수)
 
 ---
 
 ## 이어서 할 일
 
-Phase E 5/5 · Phase F 2/4 · Phase G 1/3 완료 + UX 개선 2종. 다음 진입 후보:
+Phase E 5/5 · Phase F 4/4 · Phase G 2/3 · Phase H 1/3 완료 + UX 개선 4종. 남은 트랙:
 
-- **Phase F 남은 트랙** — EOQ 기반 재고 정책 / Bullwhip 효과 / `/lab/queue` discrete-event 엔진을 results 드릴다운 탭으로 통합 (선택사항)
-- **Phase G 남은 트랙** — Adstock carryover 모델 (광고의 시차 효과를 브랜드 에쿼티와 명시 분리) / STP 프레임워크 명시 UI (세분화→타겟팅→포지셔닝)
-- **Phase H 진입** — 인사·조직경제학 (인력 규모 레버: 영업팀=직영채널 효과, R&D팀=품질상한 속도 / `otherExpense` 분해: 인건비·설비·일반관리비 3분 / 라운드 누적 학습효과)
-- **UX 후속** — 레버 단위 "예상 효과" 인라인 프리뷰 (가격 -1만원 = 수요 +X대), 모바일 탭 레이아웃 최적화
+- **Phase G 남은 트랙** — STP 프레임워크 명시 UI (세분화→타겟팅→포지셔닝 뷰)
+- **Phase H 남은 트랙** — 라운드 누적 학습효과 (경력 기반 효율성 소폭 상승) / 인력 이직률 모델 (급여 vs 업계평균에 따른 이탈)
+- **전략 해설 레이어** — 결과 페이지에 교과서 프레임워크 태그 (예: "R3 = Porter 비용우위 진입 시점") 자동 매칭
+- **모바일 레이아웃** — 탭 UI를 단일 컬럼 세로 스택으로 폴백
+- **/lab/queue discrete-event 엔진 통합 (선택)** — results 드릴다운 탭으로 분기 판매의 시간대별 M/M/1 시뮬 보여주기
 
 (선택) **Phase D 보강** — `docs/roadmap-archive/phase-d-financial-tax.md`의 "남은 보강 후보". DTA 명시화 / 세법상 이월결손금 정밀화 / 투자세액공제 / 간접법 CF 정식화
 
@@ -48,22 +52,22 @@ Phase E 5/5 · Phase F 2/4 · Phase G 1/3 완료 + UX 개선 2종. 다음 진입
 - 경쟁 강도 보강 ✅ (`lib/competitor-ai.ts`, supplyIndex 가격동조 + Star 광고가속 + 경쟁사별 cumulativeRd 스태미나)
 - Ansoff R&D 분배 ✅ (`lib/ansoff.ts`, rdAllocation improve/explore 레버, explore 누적 → 플레이어 전용 유효시장 +25% 상한)
 
-### Phase F — 운영관리 (Queueing + OM)
-- 서비스 큐 → 만족도 ✅ 2026-04-24 (`lib/service-queue.ts`, M/M/1 근사로 utilization 기반 만족도 델타·overflow 클램프, `decisions.serviceCapacity` 레버, 대당 50,000원/분기 opex)
-- 생산 리드타임 ✅ 2026-04-24 (`GameState.pendingProduction` stock, decisions.products.production → 다음 분기 실현, capacity 제약도 pending 기준으로 재계산)
-- EOQ 기반 재고 정책 (발주비용 vs 재고유지비 최적화) — 미착수
-- Bullwhip 효과 (주문 변동성 증폭, 제품별 수요 예측 정확도 피드백) — 미착수
-- (선택) `/lab/queue` discrete-event 엔진을 results 서비스 드릴다운 탭으로 통합
+### Phase F — 운영관리 (Queueing + OM) ✅ 2026-04-24
+- 서비스 큐 → 만족도 ✅ (`lib/service-queue.ts`, M/M/1 근사로 utilization 기반 만족도 델타·overflow 클램프, `decisions.serviceCapacity` 레버, 대당 50,000원/분기 opex)
+- 생산 리드타임 ✅ (`GameState.pendingProduction` stock, decisions.products.production → 다음 분기 실현)
+- EOQ 기반 재고 정책 ✅ (`lib/eoq.ts`, Q*=√(2DS/H) 공식 권장값 UI 배지, 기말재고 × 5% 재고유지비가 PnL에 반영)
+- Bullwhip 효과 ✅ (`lib/bullwhip.ts`, 플레이어 수요 변동률 > 20% 초과분이 경쟁사 광고 증폭 + SPI extra drift로 전달)
+- (선택) `/lab/queue` discrete-event 엔진을 results 서비스 드릴다운 탭으로 통합 — 미착수
 
 ### Phase G — 고급 마케팅 (CLV, Adstock, STP)
 - CLV 대시보드 ✅ 2026-04-24 (`lib/clv.ts`, retention = 0.5×satisfaction + 0.5×brandEquity, CLV = AOV × 1/(1−retention), results 페이지 4-분할 카드 + 전술 코멘트)
-- Adstock 모델 (광고 carryover를 브랜드 에쿼티와 명시 분리) — 미착수
+- Adstock 모델 ✅ 2026-04-24 (`lib/adstock.ts`, Koyck geometric lag λ=0.5, effectiveAd = currentAd + λ×prevAdstock, `GameState.adstock` stock 추가)
 - STP 프레임워크 명시 UI (세분화→타겟팅→포지셔닝) — 미착수
 
 ### Phase H — 인사·조직경제학
-- 인력 규모 레버 (영업팀 크기 → 직영 채널 효과, R&D 팀 → 품질상한 상승 속도)
-- 학습효과 (라운드 누적 경험 → 전 부문 효율성 소폭 상승)
-- `otherExpense` 분해 (현재 단일 100M → 인건비·설비·일반관리비)
+- 인력 규모 레버 ✅ 2026-04-24 (`lib/labor.ts`, `Decisions.headcount: {sales, rd}`, 영업팀 → 직영채널 배수, R&D팀 → cumulativeImproveRd 실효 배수)
+- `otherExpense` 분해 ✅ 2026-04-24 (G&A 50M + 인건비 + 설비유지 0.5%/분기 + 서비스 opex + 재고유지비 5%/분기, PnL에 5필드로 가시화)
+- 학습효과 (라운드 누적 경험 → 전 부문 효율성 소폭 상승) — 미착수
 
 ### 배포·공개 (장기 후순위)
 - LLM provider 어댑터 (Ollama 외 선택지), Vercel 배포, README + hero GIF, 블로그, v2.0 태그
@@ -79,6 +83,14 @@ Phase E 5/5 · Phase F 2/4 · Phase G 1/3 완료 + UX 개선 2종. 다음 진입
 
 ## 진행 로그
 
+- 2026-04-24 (3) 이론 심화 7종 일괄 구현 (142/142 테스트, store v14):
+  - **5 레버 인라인 프리뷰** — 탭별 민감도 분석 카드 (가격 -1만원, 품질 +1, 서비스 +5k 등 시나리오별 매출·점유·만족도 delta 실시간 계산)
+  - **1 Adstock carryover** (`lib/adstock.ts`) — Koyck λ=0.5, effectiveAd = current + λ×prevAdstock, 마케팅 탭에 carryover 뱃지
+  - **3 Phase H 진입** (`lib/labor.ts`) — 영업·R&D 인력 레버, 직영채널 배수·R&D 실효성 배수, PnL otherExpense 5필드 분해(G&A·인건비·유지비·서비스·재고유지비)
+  - **2 EOQ 재고 정책** (`lib/eoq.ts`) — Harris 1913 공식 Q*=√(2DS/H) 권장값 UI 배지, 기말재고 × 5% 재고유지비가 PnL 반영
+  - **4 Bullwhip 효과** (`lib/bullwhip.ts`) — 판매 변동률 20% 초과 시 경쟁사 광고 증폭 + SPI drift 추가, decision 페이지 경고 배지
+  - **6 라운드 간 변화 카드** (`lib/round-delta.ts`) — results 상단에 delta 5지표 + 휴리스틱 귀인 (가격/광고/품질/인력/서비스/이벤트/SPI 중 impact 1위)
+  - **7 경쟁사 프로파일 드릴다운** (`lib/competitor-trend.ts`) — 경쟁사별 가격·품질·광고·점유 sparkline + 전략 태그 (공격적 가격전략/품질 추격/광고 공세/수비 전환 등)
 - 2026-04-24 (2) UX · Phase F 심화 · Phase G 진입: (A) `/play` 의사결정 화면을 5개 탭(제품·마케팅·R&D·운영·자본)으로 재구성 + 탭별 "이 분기 쟁점" 배지 (수요초과·overflow·부채비율 등 실시간 진단) / (D) 디브리프 프롬프트에 BCG 분면·학습곡선·SPI·서비스큐·Ansoff 상태 주입, 최종 총평에 프레임워크 1회 이상 언급 요구 / (B) 생산 리드타임 — `pendingProduction` stock, production 의사결정 → 다음 분기 실현 (R1은 기초재고 기본값) / (C) CLV 대시보드 — retention = 0.5×satisfaction + 0.5×brandEquity, CLV = AOV × 1/(1-retention), 4분할 카드 + 전술 코멘트. store v12, 104/104 테스트 pass
 - 2026-04-24 Phase F 첫 트랙(서비스 큐→만족도) 구현: `lib/service-queue.ts` — analytical M/M/1 근사, utilization 구간별 만족도 델타 (+5 / 0 / 선형감소 / -25 최악), ρ≥1.0 overflow 시 판매·매출 비례 클램프. `decisions.serviceCapacity` 레버(기본 20k대), 대당 50,000원 opex가 `otherExpense`에 가산. store v11. 93/93 테스트 pass
 - 2026-04-24 Phase E 완료 (5/5): (1) 학습곡선 — Wright's Law 80% 학습률, 제품별 누적생산 stock / (2) BCG 매트릭스 — 상대점유율×성장률 4분면 scatter+버블 / (3) 공급자 교섭력 — AR(1)+drift SPI, 이벤트 costMultiplier와 곱셈 결합 / (4) 경쟁 강도 보강 — 경쟁사 cumulativeRd 스태미나, supplyIndex 가격 동조, 플레이어 Star 시 경쟁사 광고 가속 / (5) Ansoff R&D 분배 — rdAllocation {improve, explore} 레버, explore 누적 → 플레이어 전용 유효시장 최대 +25%. store v10 migration. build ✓

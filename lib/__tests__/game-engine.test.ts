@@ -17,6 +17,7 @@ const DEFAULT_DECISIONS: Decisions = {
   capexInvestment: 0,
   dividendPayout: 0,
   serviceCapacity: 20_000,
+  headcount: { sales: 4, rd: 4 },
 };
 
 function withProducts(base: Decisions, products: [ProductDecision, ProductDecision]): Decisions {
@@ -101,6 +102,7 @@ describe('runSimulation', () => {
       capexInvestment: 0,
       dividendPayout: 0,
       serviceCapacity: 20_000,
+      headcount: { sales: 4, rd: 4 },
     };
     const result = runSimulation(extreme, INITIAL_COMPETITORS, marketSize, qualityCap);
     for (const demand of Object.values(result.segmentDemand)) {
@@ -171,10 +173,12 @@ describe('runSimulation', () => {
       expect(pr.allocatedOverhead).toBeGreaterThanOrEqual(0);
       expect(pr.segmentProfit).toBe(pr.grossProfit - pr.allocatedOverhead);
     }
-    // 배분 합은 runtime overhead 근사 (광고 + R&D/4 + 100M) — 반올림 오차 허용
+    // 배분 합은 runtime overhead 근사 (광고 + R&D/4 + G&A 50M + 인건비 + 서비스 opex) — 반올림 오차 허용
     const totalOH = result.perProduct.A.allocatedOverhead + result.perProduct.B.allocatedOverhead;
+    const laborCost = (DEFAULT_DECISIONS.headcount.sales + DEFAULT_DECISIONS.headcount.rd) * 25_000_000;
+    const serviceOpex = DEFAULT_DECISIONS.serviceCapacity * 50_000;
     const runtimeOH = (DEFAULT_DECISIONS.adBudget.search + DEFAULT_DECISIONS.adBudget.display + DEFAULT_DECISIONS.adBudget.influencer)
-      + DEFAULT_DECISIONS.rdBudget / 4 + 100_000_000;
+      + DEFAULT_DECISIONS.rdBudget / 4 + 50_000_000 + laborCost + serviceOpex;
     expect(Math.abs(totalOH - runtimeOH)).toBeLessThan(10);
   });
 

@@ -3,6 +3,8 @@ import { CALM_EVENT } from './events';
 import { quarterlyCorporateTax, rdTaxCreditFor, applyLossCarryforward } from './tax';
 import { learningCurveMultiplier } from './learning-curve';
 import { SERVICE_COST_PER_UNIT } from './service-queue';
+import { laborCostOf, G_AND_A_BASELINE, MAINTENANCE_RATE } from './labor';
+import { inventoryHoldingCostOf } from './eoq';
 
 const INITIAL_CASH = 10_000_000_000;
 const INITIAL_EQUITY = 8_000_000_000;
@@ -53,9 +55,20 @@ function generatePnL(decisions: Decisions, results: SimulationResults, event: Ro
   const rdExpense = Math.round(decisions.rdBudget / 4);
   const prevPpe = previousBS?.ppe ?? INITIAL_PPE;
   const depreciationExpense = Math.round(prevPpe * DEPRECIATION_RATE);
-  // 기본 일반관리비(100M) + 서비스 capacity opex (A/S·상담·배송 대당 고정비)
+  // otherExpense 분해: G&A baseline + 인건비 + 설비유지비 + 서비스 opex + 재고유지비
+  const laborCost = laborCostOf(decisions.headcount);
+  const maintenanceCost = Math.round(prevPpe * MAINTENANCE_RATE);
   const serviceCost = decisions.serviceCapacity * SERVICE_COST_PER_UNIT;
-  const otherExpense = 100_000_000 + serviceCost;
+  // 기말 재고 평가: (produced - sold) × unit cost (학습곡선·공급지수 적용)
+  const endInventoryValue = decisions.products.reduce((sum, p) => {
+    const pr = results.perProduct[p.id];
+    const unsold = Math.max(0, pr.produced - pr.unitsSold);
+    const learningMult = learningCurveMultiplier(cumulativeProduction[p.id] ?? 0);
+    const unitCost = Math.round((120_000 + (p.quality - 1) * 25_000) * (event.effects.costMultiplier ?? 1) * learningMult * supplyIndex);
+    return sum + unsold * unitCost;
+  }, 0);
+  const inventoryHoldingCost = inventoryHoldingCostOf(endInventoryValue);
+  const otherExpense = G_AND_A_BASELINE + laborCost + maintenanceCost + serviceCost + inventoryHoldingCost;
   const operatingProfit = grossProfit - adExpense - rdExpense - depreciationExpense - otherExpense;
 
   const prevDebt = previousBS?.debt ?? INITIAL_DEBT;
@@ -81,7 +94,8 @@ function generatePnL(decisions: Decisions, results: SimulationResults, event: Ro
   const netIncome = pretaxIncome - incomeTax;
 
   return {
-    revenue, cogs, grossProfit, adExpense, rdExpense, depreciationExpense, otherExpense,
+    revenue, cogs, grossProfit, adExpense, rdExpense, depreciationExpense,
+    laborCost, maintenanceCost, serviceCost, inventoryHoldingCost, otherExpense,
     operatingProfit, interestExpense, pretaxIncome,
     currentTax, deferredTaxExpense, rdTaxCredit, incomeTax, netIncome,
   };

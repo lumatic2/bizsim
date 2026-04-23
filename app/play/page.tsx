@@ -10,6 +10,9 @@ import { INITIAL_PPE, productionCapacityFrom } from '@/lib/financial-mapper';
 import { learningCurveMultiplier } from '@/lib/learning-curve';
 import { classifyPressure, PRESSURE_LABELS } from '@/lib/supply';
 import { exploreBoostFrom } from '@/lib/ansoff';
+import { LABOR_COST_PER_HEAD, directChannelMultiplier, rdEffectivenessMultiplier } from '@/lib/labor';
+import { economicOrderQuantity } from '@/lib/eoq';
+import { playerDemandVolatility, BULLWHIP_THRESHOLD } from '@/lib/bullwhip';
 import type { ProductId } from '@/lib/types';
 
 function formatBillion(v: number) {
@@ -47,16 +50,54 @@ export default function DecisionPage() {
     currentRound, competitors, qualityCap, resetGame, roundHistory,
     currentEvent, brandEquity, cumulativeLoss, previousBS,
     cumulativeProduction, supplyIndex, cumulativeExploreRd, cumulativeImproveRd,
-    pendingProduction,
+    pendingProduction, adstock,
   } = useGameStore();
   const [activeProduct, setActiveProduct] = useState<ProductId>('A');
   const [activeTab, setActiveTab] = useState<TabId>('product');
   const capacity = productionCapacityFrom(previousBS?.ppe ?? INITIAL_PPE);
   const exploreBoost = exploreBoostFrom(cumulativeExploreRd);
+  const marketSize = getMarketSize(currentRound);
   const preview = useMemo(() => {
-    const marketSize = getMarketSize(currentRound);
-    return runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost, pendingProduction);
-  }, [decisions, currentRound, competitors, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost, pendingProduction]);
+    return runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost, pendingProduction, adstock);
+  }, [decisions, marketSize, competitors, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost, pendingProduction, adstock]);
+
+  // 민감도 분석: 현재 결정에서 레버를 한 단계 조정했을 때 매출·점유·만족도 변화량.
+  // 각 레버당 추가 runSimulation 1회 — 순수 함수, <1ms로 렌더마다 재계산 가능.
+  const runScenario = (mutator: (d: typeof decisions) => typeof decisions) => {
+    const perturbed = mutator(JSON.parse(JSON.stringify(decisions)));
+    return runSimulation(perturbed, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost, pendingProduction, adstock);
+  };
+
+  const sensitivity = useMemo(() => {
+    type ScenarioResult = ReturnType<typeof runScenario>;
+    const delta = (r: ScenarioResult) => ({
+      revenueB: (r.revenue - preview.revenue) / 1_000_000_000,
+      share: r.marketShare - preview.marketShare,
+      profitB: (r.operatingProfit - preview.operatingProfit) / 1_000_000_000,
+      satisfaction: r.satisfaction - preview.satisfaction,
+    });
+    const pid = activeProduct;
+    const pIdx = decisions.products.findIndex((p) => p.id === pid);
+    const curPrice = decisions.products[pIdx].price;
+    const curQuality = decisions.products[pIdx].quality;
+    const curProd = decisions.products[pIdx].production;
+
+    const priceDown = curPrice >= 210_000
+      ? delta(runScenario((d) => { d.products[pIdx].price = curPrice - 10_000; return d; }))
+      : null;
+    const qualityUp = curQuality < Math.floor(qualityCap)
+      ? delta(runScenario((d) => { d.products[pIdx].quality = curQuality + 1; return d; }))
+      : null;
+    const productionUp = curProd <= 19_000
+      ? delta(runScenario((d) => { d.products[pIdx].production = curProd + 1_000; return d; }))
+      : null;
+    const adUp = delta(runScenario((d) => { d.adBudget = { ...d.adBudget, search: d.adBudget.search + 100_000_000 }; return d; }));
+    const serviceUp = decisions.serviceCapacity <= 59_000
+      ? delta(runScenario((d) => { d.serviceCapacity = d.serviceCapacity + 5_000; return d; }))
+      : null;
+
+    return { priceDown, qualityUp, productionUp, adUp, serviceUp };
+  }, [decisions, preview, activeProduct, qualityCap, marketSize, competitors, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost, pendingProduction, adstock]);
 
   const totalAd = decisions.adBudget.search + decisions.adBudget.display + decisions.adBudget.influencer;
   // 이번 분기 제조원가는 pendingProduction 기준 (리드타임: 전 분기 결정분이 이번에 생산·투입)
@@ -65,7 +106,14 @@ export default function DecisionPage() {
     0,
   );
   const serviceOpex = decisions.serviceCapacity * 50_000;
-  const totalCost = totalAd + decisions.rdBudget / 4 + totalProductionCost + 100_000_000 + serviceOpex;
+  const laborCost = (decisions.headcount.sales + decisions.headcount.rd) * LABOR_COST_PER_HEAD;
+  const totalCost = totalAd + decisions.rdBudget / 4 + totalProductionCost + 50_000_000 + laborCost + serviceOpex;
+
+  // Bullwhip 경고: 이번 preview.unitsSold vs 직전 분기 unitsSold 변동률 계산
+  const lastRoundUnitsSold = roundHistory[roundHistory.length - 1]?.results.unitsSold ?? 0;
+  const projectedVolatility = lastRoundUnitsSold > 0
+    ? playerDemandVolatility(preview.unitsSold, lastRoundUnitsSold)
+    : 0;
 
   const product = decisions.products.find((p) => p.id === activeProduct) ?? decisions.products[0];
 
@@ -256,6 +304,17 @@ export default function DecisionPage() {
           이월결손금 <span className="font-mono" style={{ color: 'var(--biz-text)' }}>₩{formatBillion(cumulativeLoss)}B</span> (다음 흑자 분기 과세표준 차감 예정)
         </div>
       )}
+      {projectedVolatility > BULLWHIP_THRESHOLD && (
+        <div
+          className="text-[11px] px-3 py-1.5 rounded border-l-4"
+          style={{ borderColor: '#f59e0b', background: '#fff7ed', color: '#b45309' }}
+          title="Bullwhip 효과 — 수요 급변이 공급망 상류(공급자·경쟁사)로 증폭됨. 다음 분기 SPI 상승압력 + 경쟁사 광고 과잉반응 예상."
+        >
+          <span className="font-bold uppercase tracking-wider">Bullwhip 경고</span>
+          <span className="ml-2 font-mono">판매 변동률 {(projectedVolatility * 100).toFixed(1)}%</span>
+          <span className="ml-2 opacity-75">(임계 {(BULLWHIP_THRESHOLD * 100).toFixed(0)}% 초과 시 SPI drift +{((projectedVolatility - BULLWHIP_THRESHOLD) * 5).toFixed(1)}% / 경쟁사 광고 +{((projectedVolatility - BULLWHIP_THRESHOLD) * 100).toFixed(0)}%)</span>
+        </div>
+      )}
 
       {/* 본문: 탭 + 프리뷰 */}
       <div className="grid gap-4 lg:grid-cols-[2fr_3fr]">
@@ -331,6 +390,21 @@ export default function DecisionPage() {
               >
                 이번 분기 실현 생산(전 분기 결정분): <span className="font-mono" style={{ color: 'var(--biz-text)' }}>A {pendingProduction.A.toLocaleString()} · B {pendingProduction.B.toLocaleString()}대</span>
               </div>
+              <div
+                className="text-[11px] px-2 py-1 rounded border"
+                style={{ borderColor: 'var(--biz-border)', background: 'var(--biz-card)', color: 'var(--biz-text-muted)' }}
+                title="EOQ(Harris 1913) = √(2×D×S/H). D=이번 분기 예상 수요, S=셋업비 50M, H=단위당 분기 유지비. 참고용 권장 배치 크기."
+              >
+                {(() => {
+                  const demandA = Object.values(preview.perProduct.A.segmentDemand).reduce((s, d) => s + d, 0);
+                  const demandB = Object.values(preview.perProduct.B.segmentDemand).reduce((s, d) => s + d, 0);
+                  const eoqA = economicOrderQuantity(demandA);
+                  const eoqB = economicOrderQuantity(demandB);
+                  return (
+                    <>EOQ 권장 배치: <span className="font-mono" style={{ color: 'var(--biz-text)' }}>A ~{eoqA.toLocaleString()} · B ~{eoqB.toLocaleString()}대</span> <span className="opacity-75">(재고유지비 ↔ 셋업비 trade-off 최적)</span></>
+                  );
+                })()}
+              </div>
               <DecisionSlider
                 label={`${product.name} · 가격`}
                 value={product.price}
@@ -369,9 +443,17 @@ export default function DecisionPage() {
             <>
               <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="text-xs" style={{ color: 'var(--biz-text-muted)' }}>마케팅 믹스 (분기)</div>
+                  <div className="text-xs" style={{ color: 'var(--biz-text-muted)' }}>
+                    마케팅 믹스 (분기)
+                    <span className="ml-2 text-[10px] opacity-75">Koyck adstock λ=0.5 — 전분기 50% carryover</span>
+                  </div>
                   <div className="text-xs font-mono" style={{ color: 'var(--biz-text)' }}>합계 ₩{formatBillion(totalAd)}B</div>
                 </div>
+                {(adstock.search + adstock.display + adstock.influencer) > 0 && (
+                  <div className="text-[11px] px-2 py-1 rounded border" style={{ borderColor: 'var(--biz-border)', background: 'var(--biz-primary-light)', color: 'var(--biz-text-muted)' }}>
+                    전분기 광고 carryover 입력: 검색 ₩{formatBillion(adstock.search * 0.5)}B · 디스플레이 ₩{formatBillion(adstock.display * 0.5)}B · 인플루언서 ₩{formatBillion(adstock.influencer * 0.5)}B (이번 분기 효과에 가산)
+                  </div>
+                )}
                 {(
                   [
                     { key: 'search' as const, label: '검색 광고', hint: '박민수(얼리어답터) 반응 큼' },
@@ -471,6 +553,54 @@ export default function DecisionPage() {
           {/* 운영 탭 */}
           {activeTab === 'ops' && (
             <>
+              <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs" style={{ color: 'var(--biz-text-muted)' }}>
+                    인력 편성 (영업·R&D)
+                    <span className="ml-2 text-[10px] opacity-75">1인당 ₩{(LABOR_COST_PER_HEAD / 1_000_000).toFixed(0)}M/분기</span>
+                  </div>
+                  <div className="text-xs font-mono" style={{ color: 'var(--biz-text)' }}>
+                    총 {decisions.headcount.sales + decisions.headcount.rd}명 · ₩{formatBillion(laborCost)}B/분기
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span style={{ color: 'var(--biz-text-muted)' }}>
+                      영업팀
+                      <span className="ml-2 text-[10px] opacity-75">직영 채널 효과 ×{directChannelMultiplier(decisions.headcount.sales).toFixed(2)}</span>
+                    </span>
+                    <span className="font-mono" style={{ color: 'var(--biz-text)' }}>{decisions.headcount.sales}명</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={30}
+                    step={1}
+                    value={decisions.headcount.sales}
+                    onChange={(e) => setDecisions({ headcount: { ...decisions.headcount, sales: Number(e.target.value) } })}
+                    className="w-full accent-gray-900"
+                  />
+                </div>
+                <div>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span style={{ color: 'var(--biz-text-muted)' }}>
+                      R&D팀
+                      <span className="ml-2 text-[10px] opacity-75">R&D 실효 ×{rdEffectivenessMultiplier(decisions.headcount.rd).toFixed(2)} (개선·탐색 stock에 누적)</span>
+                    </span>
+                    <span className="font-mono" style={{ color: 'var(--biz-text)' }}>{decisions.headcount.rd}명</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={30}
+                    step={1}
+                    value={decisions.headcount.rd}
+                    onChange={(e) => setDecisions({ headcount: { ...decisions.headcount, rd: Number(e.target.value) } })}
+                    className="w-full accent-gray-900"
+                  />
+                </div>
+              </div>
+
               <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="text-xs" style={{ color: 'var(--biz-text-muted)' }}>
@@ -602,6 +732,13 @@ export default function DecisionPage() {
             </div>
           </div>
 
+          {/* 민감도 분석: 활성 탭 기준 주요 레버의 증분 효과 */}
+          <SensitivityPanel
+            activeTab={activeTab}
+            activeProduct={activeProduct}
+            sensitivity={sensitivity}
+          />
+
           <div style={{ background: 'var(--biz-primary-light)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4">
             <div className="text-xs mb-3" style={{ color: 'var(--biz-text-muted)' }}>경쟁사 비교 (B 단위 매출)</div>
             <div className="space-y-3">
@@ -637,5 +774,105 @@ export default function DecisionPage() {
         시뮬레이션 실행
       </button>
     </div>
+  );
+}
+
+type ScenarioDelta = {
+  revenueB: number;
+  share: number;
+  profitB: number;
+  satisfaction: number;
+} | null;
+
+type SensitivityState = {
+  priceDown: ScenarioDelta;
+  qualityUp: ScenarioDelta;
+  productionUp: ScenarioDelta;
+  adUp: ScenarioDelta;
+  serviceUp: ScenarioDelta;
+};
+
+type SensitivityPanelProps = {
+  activeTab: TabId;
+  activeProduct: ProductId;
+  sensitivity: SensitivityState;
+};
+
+function SensitivityPanel({ activeTab, activeProduct, sensitivity }: SensitivityPanelProps) {
+  type Row = { label: string; delta: ScenarioDelta };
+
+  let rows: Row[] = [];
+  if (activeTab === 'product') {
+    rows = [
+      { label: `제품 ${activeProduct} · 가격 −1만원`, delta: sensitivity.priceDown },
+      { label: `제품 ${activeProduct} · 품질 +1`, delta: sensitivity.qualityUp },
+      { label: `제품 ${activeProduct} · 생산 지시 +1,000대`, delta: sensitivity.productionUp },
+    ];
+  } else if (activeTab === 'marketing') {
+    rows = [
+      { label: '검색 광고 +0.1B', delta: sensitivity.adUp },
+    ];
+  } else if (activeTab === 'rd') {
+    // R&D는 이번 분기 즉시 효과 없음 — 장기 효과 메시지로 대체
+    rows = [];
+  } else if (activeTab === 'ops') {
+    rows = [
+      { label: '서비스 capacity +5,000대', delta: sensitivity.serviceUp },
+    ];
+  } else {
+    rows = [];
+  }
+
+  if (rows.length === 0 && activeTab !== 'rd' && activeTab !== 'capital') {
+    return null;
+  }
+
+  return (
+    <div className="border rounded-lg p-4 mb-4" style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }}>
+      <div className="flex items-baseline justify-between mb-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--biz-text-muted)' }}>민감도 분석</h3>
+        <span className="text-[10px]" style={{ color: 'var(--biz-text-muted)' }}>현재 결정 기준 1단계 조정 시 변화</span>
+      </div>
+      {activeTab === 'rd' && (
+        <div className="text-[11px] px-2 py-1.5 rounded" style={{ background: 'var(--biz-primary-light)', color: 'var(--biz-text-muted)' }}>
+          R&D 투자는 <span style={{ color: 'var(--biz-text)', fontWeight: 600 }}>다음 분기부터</span> 품질상한·시장확장으로 실현.<br />이번 분기 손익에는 비용만 반영.
+        </div>
+      )}
+      {activeTab === 'capital' && (
+        <div className="text-[11px] px-2 py-1.5 rounded" style={{ background: 'var(--biz-primary-light)', color: 'var(--biz-text-muted)' }}>
+          자본 조달은 시뮬 결과(매출·점유)에 직접 영향 없음.<br />현금·부채·자본잉여금·이자비용에만 반영.
+        </div>
+      )}
+      {rows.length > 0 && (
+        <div className="space-y-1.5">
+          {rows.map((r, i) => (
+            <div key={i} className="flex items-center justify-between text-[11px] py-1" style={{ borderBottomColor: 'var(--biz-border)' }}>
+              <span style={{ color: 'var(--biz-text-muted)' }}>{r.label}</span>
+              {r.delta ? (
+                <span className="font-mono" style={{ color: 'var(--biz-text)' }}>
+                  <DeltaChip value={r.delta.profitB} unit="B 이익" digits={2} />
+                  <DeltaChip value={r.delta.share} unit="%p 점유" digits={1} />
+                  {r.delta.satisfaction !== 0 && (
+                    <DeltaChip value={r.delta.satisfaction} unit=" 만족도" digits={0} />
+                  )}
+                </span>
+              ) : (
+                <span className="text-[10px]" style={{ color: 'var(--biz-text-muted)', opacity: 0.6 }}>범위 밖</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DeltaChip({ value, unit, digits }: { value: number; unit: string; digits: number }) {
+  const color = value > 0.001 ? '#047857' : value < -0.001 ? '#b91c1c' : 'var(--biz-text-muted)';
+  const sign = value > 0 ? '+' : '';
+  return (
+    <span className="ml-2" style={{ color }}>
+      {sign}{value.toFixed(digits)}{unit}
+    </span>
   );
 }

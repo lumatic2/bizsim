@@ -38,6 +38,11 @@ export type RdAllocation = {
   explore: number;  // % of rdBudget → 신시장 탐색 (플레이어 전용 시장 확장)
 };
 
+export type Headcount = {
+  sales: number;  // 영업팀 규모 — 직영 채널 효과 배수 (0.8 + N×0.05)
+  rd: number;     // R&D 팀 규모 — cumulativeImproveRd 실효 배수 (0.8 + N×0.05)
+};
+
 export type Decisions = {
   products: [ProductDecision, ProductDecision];
   rdBudget: number;
@@ -48,6 +53,7 @@ export type Decisions = {
   capexInvestment: number;  // 이번 분기 설비투자 (유형자산 증가, 다음 분기부터 capacity 반영)
   dividendPayout: number;   // 이익잉여금에서 지급하는 현금 배당 (상법 §462 배당가능이익 한도)
   serviceCapacity: number;  // 분기 서비스 처리 능력 (A/S·상담·배송). 대당 50,000원 opex 가산
+  headcount: Headcount;     // 인력 레버 (영업·R&D) — 채널 효과·R&D 실효성에 영향
 };
 
 export type ChatMessage = {
@@ -152,7 +158,11 @@ export type PnL = {
   adExpense: number;
   rdExpense: number;
   depreciationExpense: number;  // 회계상 감가상각비 (정액법 12.5%/분기)
-  otherExpense: number;
+  laborCost: number;            // 인건비 (영업·R&D 인력 × 1인당 분기 급여)
+  maintenanceCost: number;      // 설비유지비 (PPE × 유지율)
+  serviceCost: number;          // 서비스 capacity opex (대당 50,000원)
+  inventoryHoldingCost: number; // 기말 재고 × 분기 유지비율 (창고·자본기회비용)
+  otherExpense: number;         // G&A baseline + laborCost + maintenanceCost + serviceCost + inventoryHoldingCost
   operatingProfit: number;
   interestExpense: number;
   pretaxIncome: number;
@@ -218,4 +228,5 @@ export type GameState = {
   cumulativeImproveRd: number;  // Ansoff improve 누적 R&D (quality cap 산출 기반)
   cumulativeExploreRd: number;  // Ansoff explore 누적 R&D (시장 확장 부스트 기반)
   pendingProduction: Record<ProductId, number>;  // 생산 리드타임: 이번 분기에 실현되는 제품별 생산량 (전 분기 의사결정분)
+  adstock: AdMix;  // Koyck adstock: 직전 분기 효과 스톡 (이번 분기 광고 효과 = 현재 예산 + λ×adstock)
 };

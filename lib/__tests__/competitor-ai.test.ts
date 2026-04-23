@@ -6,6 +6,7 @@ const BASE_CONTEXT = {
   playerShare: 10,          // 리더 아님
   playerRelativeShare: 0.5, // < 1 → 리더 아님
   supplyIndex: 1.0,         // 정상
+  bullwhipAmp: 0,           // 변동성 없음
 };
 
 describe('updateCompetitorDecisions — supply power 가격 동조', () => {
