@@ -20,19 +20,23 @@
 
 ---
 
+## 이어서 할 일
+
+다음 세션 첫 행동: **Phase E 진입 방향 결정**. 아래 3개 중 하나로 시작.
+
+- **학습곡선 / 경험곡선** — `lib/learning-curve.ts` 신규, `GameState.cumulativeProduction` stock 추가. 공식: `unitCost *= pow(cumulative / reference, log2(learningRate))` (통상 80% 학습률). 제품별 누적 생산량 기반 단가 체감
+- **포터 공급자 교섭력** — `lib/events.ts` 또는 신규 `lib/supply.ts`에 원자재 가격 매라운드 변동 밴드 추가. 현재 고정 120,000원 unit base를 매분기 변동 지표로. 이벤트 카드의 `costMultiplier`와 상호작용
+- **BCG 매트릭스 시각화** — `app/play/results/page.tsx`에 상대점유율×시장성장률 4분면 차트 추가 (기존 포지셔닝 맵은 가격×품질 관점이라 별도)
+
+(선택) **Phase D 보강** 후보 — `docs/roadmap-archive/phase-d-financial-tax.md`의 "남은 보강 후보" 섹션 참고. DTA 명시화 / 세법상 이월결손금 정밀화 / 투자세액공제 / 간접법 CF 정식화
+
+---
+
 ## 현재 트랙 — 경영학 이론 심화
 
 각 Phase는 리서치 → 모델링 → 구현 사이클 한 번. 순서는 재조정 가능.
 
-### Phase D — 재무·세무회계 완성 ✅ 2026-04-23
-- [x] 법인세 — 한국 누진세율표(9/19/21/24%) 분기 단위 연환산 적용
-- [x] R&D 세액공제 — 조특법 §10 중소기업 25%, 산출세액 50% 한도
-- [x] 감가상각 + CAPEX — 회계상 8분기 정액법, 세법상 4분기 가속상각, ppe 500,000원당 1대 capacity
-- [x] 자본잉여금 분리 — 증자 시 capitalSurplus에 계상
-- [x] 결손금 이월공제 — 게임 전체 기간 이월 (15년 단순화)
-- [x] 배당 — 배당가능이익(상법 §462) 한도 내 현금 배당, BS·CF 반영
-- [x] 이연법인세 — 세법·회계 감가상각 일시차이에서 DTL 누적, PnL에 currentTax/deferredTaxExpense 분리
-- [x] 원가배분 정교화 — ProductResult에 cogs/grossProfit/allocatedOverhead/segmentProfit, 매출 비중 기반 배분. 재무제표 "제품별 손익" 탭 추가
+- Phase D — 재무·세무회계 완성 ✅ 2026-04-23 · [archive](docs/roadmap-archive/phase-d-financial-tax.md)
 
 ### Phase E — 전략론 (Porter·BCG·Ansoff)
 - 학습곡선 / 경험곡선 (누적 생산량 → unit cost 체감, BCG Cash Cow 원리)
