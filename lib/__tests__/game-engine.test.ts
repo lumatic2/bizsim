@@ -10,11 +10,13 @@ const PRODUCT_B: ProductDecision = { id: 'B', name: '밸류', price: 279_000, qu
 const DEFAULT_DECISIONS: Decisions = {
   products: [PRODUCT_A, PRODUCT_B],
   rdBudget: 2_100_000_000,
+  rdAllocation: { improve: 70, explore: 30 },
   adBudget: { search: 300_000_000, display: 250_000_000, influencer: 250_000_000 },
   channels: { online: 60, mart: 30, direct: 10 },
   financing: { newDebt: 0, newEquity: 0 },
   capexInvestment: 0,
   dividendPayout: 0,
+  serviceCapacity: 20_000,
 };
 
 function withProducts(base: Decisions, products: [ProductDecision, ProductDecision]): Decisions {
@@ -92,11 +94,13 @@ describe('runSimulation', () => {
         { ...PRODUCT_B, price: 500_000, quality: 1, production: 30_000 },
       ],
       rdBudget: 0,
+      rdAllocation: { improve: 70, explore: 30 },
       adBudget: { search: 0, display: 0, influencer: 0 },
       channels: { online: 100, mart: 0, direct: 0 },
       financing: { newDebt: 0, newEquity: 0 },
       capexInvestment: 0,
       dividendPayout: 0,
+      serviceCapacity: 20_000,
     };
     const result = runSimulation(extreme, INITIAL_COMPETITORS, marketSize, qualityCap);
     for (const demand of Object.values(result.segmentDemand)) {

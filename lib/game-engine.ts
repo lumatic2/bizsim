@@ -1,6 +1,8 @@
 import type { Decisions, SimulationResults, PersonaId, CompetitorState, RoundEvent, ProductDecision, ProductResult, ProductId } from './types';
 import { PERSONAS } from './personas';
 import { CALM_EVENT } from './events';
+import { learningCurveMultiplier } from './learning-curve';
+import { serviceQueueImpact, SERVICE_COST_PER_UNIT } from './service-queue';
 
 const BASE_PRICE = 349_000;
 const BASE_QUALITY = 3;
@@ -59,8 +61,8 @@ function calculateSegmentDemand(
   return result as Record<PersonaId, number>;
 }
 
-function unitCostFor(quality: number, costMultiplier: number): number {
-  return Math.round((120_000 + (quality - 1) * 25_000) * costMultiplier);
+function unitCostFor(quality: number, costMultiplier: number, learningMultiplier: number = 1, supplyIndex: number = 1): number {
+  return Math.round((120_000 + (quality - 1) * 25_000) * costMultiplier * learningMultiplier * supplyIndex);
 }
 
 export function runSimulation(
@@ -71,9 +73,14 @@ export function runSimulation(
   event: RoundEvent = CALM_EVENT,
   brandEquity: number = NEUTRAL_BRAND,
   productionCapacity: number = Infinity,
+  cumulativeProduction: Record<ProductId, number> = { A: 0, B: 0 },
+  supplyIndex: number = 1,
+  exploreBoost: number = 0,
 ): SimulationResults {
   const effects = event.effects;
   const effectiveMarketSize = Math.round(marketSize * (effects.marketSizeMultiplier ?? 1));
+  // Ansoff explore: 플레이어 전용 유효시장 확장. 경쟁사는 기존 effectiveMarketSize로 계산.
+  const playerMarketSize = Math.round(effectiveMarketSize * (1 + exploreBoost));
   const effectiveQualityCap = qualityCap + (effects.qualityCapBonus ?? 0);
   const martPenalty = effects.martChannelPenalty ?? 1;
   const competitorBoost = effects.competitorQualityBoost ?? 0;
@@ -105,12 +112,15 @@ export function runSimulation(
       channels: decisions.channels,
     };
 
-    const sd = calculateSegmentDemand(demandInput, effectiveMarketSize, martPenalty, brandEquity);
+    const sd = calculateSegmentDemand(demandInput, playerMarketSize, martPenalty, brandEquity);
     const totalDemand = Object.values(sd).reduce((s, d) => s + d, 0);
     const effectiveProduction = Math.floor(product.production * capacityRatio);
     const unitsSold = Math.min(totalDemand, effectiveProduction);
     const revenue = unitsSold * product.price;
-    const unitCost = unitCostFor(effectiveQuality, costMultiplier);
+    // 학습곡선: 기초 누적생산량 기준으로 이번 분기 unit cost 체감 계수 결정.
+    // (이번 분기 생산 전 stock으로 계산 → 분기 내 비선형 효과는 근사 생략, 제품별 독립 적용)
+    const learningMult = learningCurveMultiplier(cumulativeProduction[product.id] ?? 0);
+    const unitCost = unitCostFor(effectiveQuality, costMultiplier, learningMult, supplyIndex);
     const productCogs = unitsSold * unitCost;
     totalCogs += productCogs;
     totalUnitsSold += unitsSold;
@@ -138,6 +148,24 @@ export function runSimulation(
       segmentProfit: revenue - productCogs,
       segmentDemand: sd,
     };
+  }
+
+  // 서비스 큐 오버플로: 서비스 capacity 초과 시 실판매량·매출 비례 축소 (제품별 균등).
+  // weightedSatisfaction/weightedUnits는 비례 축소해도 평균 불변이므로 재계산 불필요.
+  const queueMetrics = serviceQueueImpact(totalUnitsSold, decisions.serviceCapacity);
+  if (queueMetrics.overflow > 0 && totalUnitsSold > 0) {
+    const scale = queueMetrics.effectiveSales / totalUnitsSold;
+    for (const id of ['A', 'B'] as ProductId[]) {
+      const pr = perProduct[id];
+      pr.unitsSold = Math.floor(pr.unitsSold * scale);
+      pr.revenue = Math.floor(pr.revenue * scale);
+      pr.cogs = Math.floor(pr.cogs * scale);
+      pr.grossProfit = pr.revenue - pr.cogs;
+      pr.segmentProfit = pr.grossProfit - pr.allocatedOverhead;
+    }
+    totalUnitsSold = perProduct.A.unitsSold + perProduct.B.unitsSold;
+    totalRevenue = perProduct.A.revenue + perProduct.B.revenue;
+    totalCogs = perProduct.A.cogs + perProduct.B.cogs;
   }
 
   // 공통간접비 매출 비중 배분: 광고·R&D·감가상각·일반관리비·이자비용 합계를 제품 매출 비율로 나눔.
@@ -169,10 +197,14 @@ export function runSimulation(
   const marketShare = totalMarket > 0 ? Math.round((totalUnitsSold / totalMarket) * 100 * 10) / 10 : 0;
 
   const grossProfit = totalRevenue - totalCogs;
-  const operatingProfit = grossProfit - totalAd - decisions.rdBudget / 4 - 100_000_000;
+  const serviceCost = decisions.serviceCapacity * SERVICE_COST_PER_UNIT;
+  const operatingProfit = grossProfit - totalAd - decisions.rdBudget / 4 - 100_000_000 - serviceCost;
 
   const avgSatisfaction = weightedUnits > 0 ? weightedSatisfaction / weightedUnits : 0;
-  const satisfaction = Math.round(clamp(avgSatisfaction - (effects.satisfactionPenalty ?? 0), 0, 100));
+  const satisfaction = Math.round(clamp(
+    avgSatisfaction - (effects.satisfactionPenalty ?? 0) + queueMetrics.satisfactionDelta,
+    0, 100,
+  ));
 
   const updatedCompetitors: CompetitorState[] = competitors.map((c, i) => {
     const cShareRatio = totalMarket > 0 ? competitorDemands[i] / totalMarket : 0;
@@ -196,6 +228,11 @@ export function runSimulation(
     marketSize: effectiveMarketSize,
     competitors: updatedCompetitors,
     perProduct,
+    serviceQueue: {
+      utilization: queueMetrics.utilization,
+      satisfactionDelta: queueMetrics.satisfactionDelta,
+      overflow: queueMetrics.overflow,
+    },
   };
 }
 

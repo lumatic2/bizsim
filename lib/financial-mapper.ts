@@ -1,6 +1,8 @@
-import type { Decisions, SimulationResults, FinancialStatements, PnL, BalanceSheet, CashFlow, CarryForwardBS, RoundEvent } from './types';
+import type { Decisions, SimulationResults, FinancialStatements, PnL, BalanceSheet, CashFlow, CarryForwardBS, RoundEvent, ProductId } from './types';
 import { CALM_EVENT } from './events';
 import { quarterlyCorporateTax, rdTaxCreditFor, applyLossCarryforward } from './tax';
+import { learningCurveMultiplier } from './learning-curve';
+import { SERVICE_COST_PER_UNIT } from './service-queue';
 
 const INITIAL_CASH = 10_000_000_000;
 const INITIAL_EQUITY = 8_000_000_000;
@@ -23,23 +25,26 @@ export function generateFinancials(
   previousBS?: CarryForwardBS | null,
   event: RoundEvent = CALM_EVENT,
   carryforwardLoss: number = 0,
+  cumulativeProduction: Record<ProductId, number> = { A: 0, B: 0 },
+  supplyIndex: number = 1,
 ): FinancialStatements {
-  const pnl = generatePnL(decisions, results, event, previousBS, carryforwardLoss);
+  const pnl = generatePnL(decisions, results, event, previousBS, carryforwardLoss, cumulativeProduction, supplyIndex);
   const prevRetained = previousBS?.retainedEarnings ?? 0;
   const distributable = Math.max(0, prevRetained + pnl.netIncome);
   const dividendPaid = Math.min(Math.max(0, decisions.dividendPayout), distributable);
 
-  const bs = generateBS(decisions, results, pnl, previousBS, event, dividendPaid);
+  const bs = generateBS(decisions, results, pnl, previousBS, event, dividendPaid, cumulativeProduction, supplyIndex);
   const cf = generateCF(decisions, pnl, dividendPaid);
   return { pnl, bs, cf };
 }
 
-function generatePnL(decisions: Decisions, results: SimulationResults, event: RoundEvent, previousBS: CarryForwardBS | null | undefined, carryforwardLoss: number): PnL {
+function generatePnL(decisions: Decisions, results: SimulationResults, event: RoundEvent, previousBS: CarryForwardBS | null | undefined, carryforwardLoss: number, cumulativeProduction: Record<ProductId, number>, supplyIndex: number): PnL {
   const revenue = results.revenue;
   const costMult = event.effects.costMultiplier ?? 1;
   const cogs = decisions.products.reduce((sum, p) => {
     const pr = results.perProduct[p.id];
-    const unitCost = Math.round((120_000 + (p.quality - 1) * 25_000) * costMult);
+    const learningMult = learningCurveMultiplier(cumulativeProduction[p.id] ?? 0);
+    const unitCost = Math.round((120_000 + (p.quality - 1) * 25_000) * costMult * learningMult * supplyIndex);
     return sum + pr.unitsSold * unitCost;
   }, 0);
   const grossProfit = revenue - cogs;
@@ -48,7 +53,9 @@ function generatePnL(decisions: Decisions, results: SimulationResults, event: Ro
   const rdExpense = Math.round(decisions.rdBudget / 4);
   const prevPpe = previousBS?.ppe ?? INITIAL_PPE;
   const depreciationExpense = Math.round(prevPpe * DEPRECIATION_RATE);
-  const otherExpense = 100_000_000;
+  // 기본 일반관리비(100M) + 서비스 capacity opex (A/S·상담·배송 대당 고정비)
+  const serviceCost = decisions.serviceCapacity * SERVICE_COST_PER_UNIT;
+  const otherExpense = 100_000_000 + serviceCost;
   const operatingProfit = grossProfit - adExpense - rdExpense - depreciationExpense - otherExpense;
 
   const prevDebt = previousBS?.debt ?? INITIAL_DEBT;
@@ -80,7 +87,7 @@ function generatePnL(decisions: Decisions, results: SimulationResults, event: Ro
   };
 }
 
-function generateBS(decisions: Decisions, results: SimulationResults, pnl: PnL, previousBS: CarryForwardBS | null | undefined, event: RoundEvent, dividendPaid: number): BalanceSheet {
+function generateBS(decisions: Decisions, results: SimulationResults, pnl: PnL, previousBS: CarryForwardBS | null | undefined, event: RoundEvent, dividendPaid: number, cumulativeProduction: Record<ProductId, number>, supplyIndex: number): BalanceSheet {
   const prevCash = previousBS?.cash ?? INITIAL_CASH;
   const prevDebt = previousBS?.debt ?? INITIAL_DEBT;
   const prevEquity = previousBS?.equity ?? INITIAL_EQUITY;
@@ -97,7 +104,8 @@ function generateBS(decisions: Decisions, results: SimulationResults, pnl: PnL, 
   const inventory = decisions.products.reduce((sum, p) => {
     const pr = results.perProduct[p.id];
     const unsold = Math.max(0, pr.produced - pr.unitsSold);
-    const unitCost = Math.round((120_000 + (p.quality - 1) * 25_000) * costMult);
+    const learningMult = learningCurveMultiplier(cumulativeProduction[p.id] ?? 0);
+    const unitCost = Math.round((120_000 + (p.quality - 1) * 25_000) * costMult * learningMult * supplyIndex);
     return sum + unsold * unitCost;
   }, 0);
   const receivables = Math.round(pnl.revenue * 0.15);

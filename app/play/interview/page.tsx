@@ -8,12 +8,13 @@ import { PERSONAS } from '@/lib/personas';
 import { runSimulation } from '@/lib/game-engine';
 import { generateFinancials, INITIAL_PPE, productionCapacityFrom } from '@/lib/financial-mapper';
 import { getMarketSize } from '@/lib/competitor-ai';
+import { exploreBoostFrom } from '@/lib/ansoff';
 import { SERVER_ERROR_MESSAGE } from '@/lib/errors';
 
 export default function InterviewPage() {
   const router = useRouter();
   const {
-    decisions, chatHistories, selectedPersona, competitors, currentRound, qualityCap, previousBS, currentEvent, brandEquity, cumulativeLoss,
+    decisions, chatHistories, selectedPersona, competitors, currentRound, qualityCap, previousBS, currentEvent, brandEquity, cumulativeLoss, cumulativeProduction, supplyIndex, cumulativeExploreRd,
     setSelectedPersona, addMessage, appendToLastAssistant,
     setResults, setFinancials,
   } = useGameStore();
@@ -64,9 +65,10 @@ export default function InterviewPage() {
   const handleRunSimulation = () => {
     const marketSize = getMarketSize(currentRound);
     const capacity = productionCapacityFrom(previousBS?.ppe ?? INITIAL_PPE);
-    const results = runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity);
+    const exploreBoost = exploreBoostFrom(cumulativeExploreRd);
+    const results = runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost);
     setResults(results);
-    const financials = generateFinancials(decisions, results, previousBS, currentEvent, cumulativeLoss);
+    const financials = generateFinancials(decisions, results, previousBS, currentEvent, cumulativeLoss, cumulativeProduction, supplyIndex);
     setFinancials(financials);
     router.push('/play/results');
   };

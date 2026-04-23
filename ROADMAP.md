@@ -1,6 +1,6 @@
 # BizSim Roadmap
 
-마지막 업데이트: 2026-04-23
+마지막 업데이트: 2026-04-24
 정체성: **경영학 이론 기반 심화 시뮬**로서의 완성도 우선 (2026-04-23 재전환, 직전 "포트폴리오·배포 우선" 노선 대체)
 비전: 재무·세무회계, 전략론(Porter/BCG/Ansoff), 운영관리(Queueing/EOQ), 고급 마케팅, 조직경제학이 실제 레버·동학으로 녹아있는 시뮬레이션
 
@@ -8,8 +8,8 @@
 
 ## 트랙 구조
 
-- **메인**: 마케팅 시뮬 `/play/*` (이론 심화 진행 중)
-- **보류**: 큐잉 시뮬 `/lab/queue` — Phase F에서 메인 트랙에 흡수 예정 (고객 서비스 대기시간 → 만족도)
+- **메인**: 마케팅 시뮬 `/play/*` (이론 심화 진행 중). 서비스 큐→만족도는 2026-04-24에 analytical 수준으로 흡수됨.
+- **교보재**: 큐잉 시뮬 `/lab/queue` — discrete-event 시뮬 엔진은 별도 유지. Phase F 심화 단계에서 results 드릴다운으로 통합 여부 결정.
 
 ---
 
@@ -17,18 +17,24 @@
 
 - PRD v2.0 핵심: 12+ 레버, 3 페르소나, 6 라운드, 재무제표 3종, AI 디브리프(로컬 Ollama), localStorage 저장/복원
 - v2.0 엔진 심화 Phase A/B/C `8842731` (2026-04-23): 이벤트 카드 6종·브랜드 에쿼티 stock·마케팅 믹스 3채널·자본 조달(부채/증자)·제품 라인 2개(A/B)
+- Phase D 재무·세무회계 완성 (2026-04-23): 법인세·R&D 세액공제·CAPEX·결손금 이월 + 배당·이연법인세·원가배분
+- Phase E 전략론 완성 (2026-04-24): 학습곡선·BCG·포터 공급자·경쟁강도·Ansoff
 
 ---
 
 ## 이어서 할 일
 
-다음 세션 첫 행동: **Phase E 진입 방향 결정**. 아래 3개 중 하나로 시작.
+Phase E 5/5 · Phase F 1/4 완료. 다음 진입 후보:
 
-- **학습곡선 / 경험곡선** — `lib/learning-curve.ts` 신규, `GameState.cumulativeProduction` stock 추가. 공식: `unitCost *= pow(cumulative / reference, log2(learningRate))` (통상 80% 학습률). 제품별 누적 생산량 기반 단가 체감
-- **포터 공급자 교섭력** — `lib/events.ts` 또는 신규 `lib/supply.ts`에 원자재 가격 매라운드 변동 밴드 추가. 현재 고정 120,000원 unit base를 매분기 변동 지표로. 이벤트 카드의 `costMultiplier`와 상호작용
-- **BCG 매트릭스 시각화** — `app/play/results/page.tsx`에 상대점유율×시장성장률 4분면 차트 추가 (기존 포지셔닝 맵은 가격×품질 관점이라 별도)
+- **Phase F 심화** — 현재는 `serviceCapacity` → utilization → 만족도 델타의 analytical 근사만 반영. 남은 작업:
+  (a) **생산 리드타임** — 이번 분기 production 결정이 다음 분기 생산으로 실현 (현재는 즉시). `pendingProduction: Record<ProductId, number>` stock 추가.
+  (b) **EOQ 기반 재고 정책** — 현재 재고는 unsold 자동 누적. 발주비용 vs 재고유지비 최적화 레버 추가.
+  (c) **Bullwhip** — 수요 예측 오차에 따른 주문 변동성 증폭. 제품별 수요 예측 정확도 피드백.
+  (d) `/lab/queue`의 discrete-event 엔진을 results 페이지 "서비스 드릴다운" 탭으로 통합 (선택사항).
+- **Phase G 진입** — 고급 마케팅 (CLV 대시보드, Adstock carryover, STP 프레임워크 UI). 가장 가볍게 착수 가능한 트랙.
+- **Phase H 진입** — 인사·조직경제학 (인력 규모 레버, otherExpense 분해).
 
-(선택) **Phase D 보강** 후보 — `docs/roadmap-archive/phase-d-financial-tax.md`의 "남은 보강 후보" 섹션 참고. DTA 명시화 / 세법상 이월결손금 정밀화 / 투자세액공제 / 간접법 CF 정식화
+(선택) **Phase D 보강** — `docs/roadmap-archive/phase-d-financial-tax.md`의 "남은 보강 후보". DTA 명시화 / 세법상 이월결손금 정밀화 / 투자세액공제 / 간접법 CF 정식화
 
 ---
 
@@ -38,17 +44,19 @@
 
 - Phase D — 재무·세무회계 완성 ✅ 2026-04-23 · [archive](docs/roadmap-archive/phase-d-financial-tax.md)
 
-### Phase E — 전략론 (Porter·BCG·Ansoff)
-- 학습곡선 / 경험곡선 (누적 생산량 → unit cost 체감, BCG Cash Cow 원리)
-- 포터 5 forces 일부: 공급자 교섭력(원자재 가격 매라운드 밴드), 경쟁 강도(경쟁사 AI 신규 변수 반응성 보강)
-- BCG 매트릭스 시각화 (제품 A/B의 상대 점유율 × 시장 성장률 뷰)
-- Ansoff 관점 R&D 분배 (기존 제품 개선 vs 신시장 탐색)
+### Phase E — 전략론 (Porter·BCG·Ansoff) ✅ 2026-04-24
+- 학습곡선 / 경험곡선 ✅ (`lib/learning-curve.ts`, Wright's Law 80% 학습률, 제품별 `cumulativeProduction` stock)
+- BCG 매트릭스 시각화 ✅ (`lib/bcg.ts`, 상대점유율×시장성장률 4분면 scatter + 버블 차트)
+- 포터 공급자 교섭력 ✅ (`lib/supply.ts`, AR(1) + drift Supply Price Index, 이벤트 costMultiplier와 곱셈 결합)
+- 경쟁 강도 보강 ✅ (`lib/competitor-ai.ts`, supplyIndex 가격동조 + Star 광고가속 + 경쟁사별 cumulativeRd 스태미나)
+- Ansoff R&D 분배 ✅ (`lib/ansoff.ts`, rdAllocation improve/explore 레버, explore 누적 → 플레이어 전용 유효시장 +25% 상한)
 
 ### Phase F — 운영관리 (Queueing + OM)
-- `/lab/queue` 엔진 메인 트랙 흡수 → 고객 서비스 대기시간이 만족도·재구매에 영향
-- 생산 리드타임 (결정한 production이 다음 분기에 실현)
-- EOQ 기반 재고 정책 (발주비용 vs 재고유지비 최적화)
-- Bullwhip 효과 (주문 변동성 증폭, 제품별 수요 예측 정확도 피드백)
+- 서비스 큐 → 만족도 ✅ 2026-04-24 (`lib/service-queue.ts`, M/M/1 근사로 utilization 기반 만족도 델타·overflow 클램프, `decisions.serviceCapacity` 레버, 대당 50,000원/분기 opex)
+- 생산 리드타임 (결정한 production이 다음 분기에 실현) — 미착수
+- EOQ 기반 재고 정책 (발주비용 vs 재고유지비 최적화) — 미착수
+- Bullwhip 효과 (주문 변동성 증폭, 제품별 수요 예측 정확도 피드백) — 미착수
+- (선택) `/lab/queue` discrete-event 엔진을 results 서비스 드릴다운 탭으로 통합
 
 ### Phase G — 고급 마케팅 (CLV, Adstock, STP)
 - CLV 지표 (브랜드 충성도 × 재구매율 × 평균 구매액) 대시보드
@@ -74,6 +82,8 @@
 
 ## 진행 로그
 
+- 2026-04-24 Phase F 첫 트랙(서비스 큐→만족도) 구현: `lib/service-queue.ts` — analytical M/M/1 근사, utilization 구간별 만족도 델타 (+5 / 0 / 선형감소 / -25 최악), ρ≥1.0 overflow 시 판매·매출 비례 클램프. `decisions.serviceCapacity` 레버(기본 20k대), 대당 50,000원 opex가 `otherExpense`에 가산. store v11. 93/93 테스트 pass
+- 2026-04-24 Phase E 완료 (5/5): (1) 학습곡선 — Wright's Law 80% 학습률, 제품별 누적생산 stock / (2) BCG 매트릭스 — 상대점유율×성장률 4분면 scatter+버블 / (3) 공급자 교섭력 — AR(1)+drift SPI, 이벤트 costMultiplier와 곱셈 결합 / (4) 경쟁 강도 보강 — 경쟁사 cumulativeRd 스태미나, supplyIndex 가격 동조, 플레이어 Star 시 경쟁사 광고 가속 / (5) Ansoff R&D 분배 — rdAllocation {improve, explore} 레버, explore 누적 → 플레이어 전용 유효시장 최대 +25%. store v10 migration. build ✓
 - 2026-04-23 Phase D 확장: 배당(상법 §462) + 이연법인세(세법·회계 일시차이) + 원가배분 정교화(제품별 segmentProfit, 재무제표 제품별 손익 탭). 46/46 테스트 pass
 - 2026-04-23 Phase D 재무·세무회계 완성: 법인세·R&D 세액공제·자본잉여금 분리·결손금 이월·CAPEX/감가상각/생산capacity. PnL에 pretaxIncome/incomeTax/rdTaxCredit/depreciationExpense, BS에 taxPayable/capitalSurplus/ppe. 41/41 테스트 pass
 - 2026-04-23 정체성 재전환: 포트폴리오·배포 우선 → 경영학 이론 심화 우선. 배포는 Phase D~H 완료 후 장기 후순위로 이동. AGENTS.md(Codex 잔재) 제거, CLAUDE.md의 `@anthropic-ai/sdk` 문구 정정

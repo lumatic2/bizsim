@@ -7,6 +7,9 @@ import { DecisionSlider } from '@/components/DecisionSlider';
 import { runSimulation } from '@/lib/game-engine';
 import { getMarketSize } from '@/lib/competitor-ai';
 import { INITIAL_PPE, productionCapacityFrom } from '@/lib/financial-mapper';
+import { learningCurveMultiplier } from '@/lib/learning-curve';
+import { classifyPressure, PRESSURE_LABELS } from '@/lib/supply';
+import { exploreBoostFrom } from '@/lib/ansoff';
 import type { ProductId } from '@/lib/types';
 
 function formatBillion(v: number) {
@@ -19,13 +22,14 @@ function formatMan(v: number) {
 
 export default function DecisionPage() {
   const router = useRouter();
-  const { decisions, setDecisions, setChannels, setProduct, currentRound, competitors, qualityCap, resetGame, roundHistory, currentEvent, brandEquity, cumulativeLoss, previousBS } = useGameStore();
+  const { decisions, setDecisions, setChannels, setProduct, currentRound, competitors, qualityCap, resetGame, roundHistory, currentEvent, brandEquity, cumulativeLoss, previousBS, cumulativeProduction, supplyIndex, cumulativeExploreRd, cumulativeImproveRd } = useGameStore();
   const [activeProduct, setActiveProduct] = useState<ProductId>('A');
   const capacity = productionCapacityFrom(previousBS?.ppe ?? INITIAL_PPE);
+  const exploreBoost = exploreBoostFrom(cumulativeExploreRd);
   const preview = useMemo(() => {
     const marketSize = getMarketSize(currentRound);
-    return runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity);
-  }, [decisions, currentRound, competitors, qualityCap, currentEvent, brandEquity, capacity]);
+    return runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost);
+  }, [decisions, currentRound, competitors, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost]);
 
   const totalAd = decisions.adBudget.search + decisions.adBudget.display + decisions.adBudget.influencer;
   const totalProductionCost = decisions.products.reduce(
@@ -122,6 +126,23 @@ export default function DecisionPage() {
           </span>
         )}
       </div>
+      <div
+        className="flex items-center gap-3 text-xs border rounded-md px-3 py-2"
+        style={{
+          borderColor: 'var(--biz-border)',
+          background: classifyPressure(supplyIndex) === 'crisis' ? '#fef2f2'
+            : classifyPressure(supplyIndex) === 'tight' ? '#fff7ed'
+            : classifyPressure(supplyIndex) === 'favorable' ? '#ecfdf5'
+            : 'var(--biz-card)',
+          color: 'var(--biz-text-muted)',
+        }}
+        title="Porter 5 Forces · 공급자 교섭력 — 원자재 가격 지수. 이벤트 카드와 곱셈으로 결합되어 유닛 원가에 반영됨."
+      >
+        <span style={{ fontWeight: 600, color: 'var(--biz-text)' }}>공급자 가격 지수</span>
+        <span className="font-mono" style={{ color: 'var(--biz-text)' }}>×{supplyIndex.toFixed(3)}</span>
+        <span>{PRESSURE_LABELS[classifyPressure(supplyIndex)]}</span>
+        <span className="ml-auto text-[10px] opacity-75">기준 1.000 · AR(1) 평균회귀 + 상승편향 drift</span>
+      </div>
 
       <h2 className="text-xs font-[Manrope] font-bold uppercase tracking-wider" style={{ color: 'var(--biz-text-muted)' }}>의사결정 레버</h2>
 
@@ -143,6 +164,12 @@ export default function DecisionPage() {
                   {p.id} · {p.name}
                 </button>
               ))}
+            </div>
+            <div className="flex items-center justify-between text-[11px]" style={{ color: 'var(--biz-text-muted)' }}>
+              <span>학습곡선 누적 {cumulativeProduction[product.id].toLocaleString()}대</span>
+              <span className="font-mono" title="Wright's Law 80% 학습률 — 누적 2배 시 단위원가 80% 체감">
+                원가계수 ×{learningCurveMultiplier(cumulativeProduction[product.id]).toFixed(3)}
+              </span>
             </div>
             <DecisionSlider
               label={`${product.name} · 가격`}
@@ -186,6 +213,35 @@ export default function DecisionPage() {
             formatValue={(v) => `₩${formatBillion(v)}B`}
             onChange={(v) => setDecisions({ rdBudget: v })}
           />
+          <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span style={{ color: 'var(--biz-text-muted)' }}>
+                Ansoff R&D 분배
+                <span className="ml-2 text-[10px] opacity-75">개선 = 품질상한 상승 · 탐색 = 신시장(플레이어 전용 시장 확장)</span>
+              </span>
+              <span className="font-mono" style={{ color: 'var(--biz-text)' }}>
+                개선 {decisions.rdAllocation.improve}% · 탐색 {decisions.rdAllocation.explore}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={decisions.rdAllocation.improve}
+              onChange={(e) => {
+                const improve = Number(e.target.value);
+                setDecisions({ rdAllocation: { improve, explore: 100 - improve } });
+              }}
+              className="w-full accent-gray-900"
+            />
+            <div className="text-[11px] font-mono flex items-center justify-between" style={{ color: 'var(--biz-text-muted)' }}>
+              <span>누적 개선 ₩{formatBillion(cumulativeImproveRd)}B · 탐색 ₩{formatBillion(cumulativeExploreRd)}B</span>
+              <span title="신시장 R&D 누적에 따른 플레이어 전용 유효시장 배수 (최대 +25%)">
+                시장확장 +{(exploreBoost * 100).toFixed(1)}%
+              </span>
+            </div>
+          </div>
           <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="text-xs" style={{ color: 'var(--biz-text-muted)' }}>마케팅 믹스 (분기)</div>
@@ -238,6 +294,36 @@ export default function DecisionPage() {
                 />
               </div>
             ))}
+          </div>
+
+          <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs" style={{ color: 'var(--biz-text-muted)' }}>
+                서비스 capacity (A/S·상담·배송)
+                <span className="ml-2 text-[10px] opacity-75">대당 50,000원/분기 · 초과 판매는 오버플로로 소실</span>
+              </div>
+              <div className="text-xs font-mono" style={{ color: 'var(--biz-text)' }}>
+                ρ {preview.serviceQueue.utilization === Infinity ? '∞' : preview.serviceQueue.utilization.toFixed(2)}
+                {preview.serviceQueue.overflow > 0 && (
+                  <span className="ml-2" style={{ color: '#b91c1c' }}>overflow {preview.serviceQueue.overflow.toLocaleString()}대</span>
+                )}
+              </div>
+            </div>
+            <div>
+              <div className="mb-1 flex items-center justify-between text-xs">
+                <span style={{ color: 'var(--biz-text-muted)' }}>분기 서비스 처리능력</span>
+                <span className="font-mono" style={{ color: 'var(--biz-text)' }}>{decisions.serviceCapacity.toLocaleString()}대 · ₩{formatBillion(decisions.serviceCapacity * 50_000)}B</span>
+              </div>
+              <input
+                type="range"
+                min={5_000}
+                max={60_000}
+                step={1_000}
+                value={decisions.serviceCapacity}
+                onChange={(e) => setDecisions({ serviceCapacity: Number(e.target.value) })}
+                className="w-full accent-gray-900"
+              />
+            </div>
           </div>
 
           <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 space-y-3">

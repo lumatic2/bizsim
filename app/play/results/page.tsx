@@ -6,7 +6,9 @@ import { useGameStore } from '@/stores/game-store';
 import { MetricCard } from '@/components/MetricCard';
 import { AIDebrief } from '@/components/AIDebrief';
 import { PERSONAS } from '@/lib/personas';
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, ZAxis } from 'recharts';
+import { computeBCGPositions } from '@/lib/bcg';
+import type { SimulationResults, Decisions, RoundSnapshot } from '@/lib/types';
+import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea, ResponsiveContainer, ZAxis } from 'recharts';
 
 function formatKRW(value: number): string {
   const abs = Math.abs(value);
@@ -116,6 +118,9 @@ export default function ResultsPage() {
           onComplete={(text) => setRoundDebrief(currentRound, text)}
         />
       )}
+
+      {/* BCG 매트릭스 — 상대점유율 × 시장성장률 */}
+      <BCGMatrix results={results} decisions={decisions} roundHistory={roundHistory} />
 
       {/* 포지셔닝 맵 */}
       <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 mb-6">
@@ -316,6 +321,103 @@ export default function ResultsPage() {
         >
           재무제표 보기 →
         </button>
+      </div>
+    </div>
+  );
+}
+
+type BCGMatrixProps = {
+  results: SimulationResults;
+  decisions: Decisions;
+  roundHistory: RoundSnapshot[];
+};
+
+function BCGMatrix({ results, decisions, roundHistory }: BCGMatrixProps) {
+  const positions = useMemo(
+    () => computeBCGPositions(results, decisions, roundHistory),
+    [results, decisions, roundHistory],
+  );
+
+  // 차트 범위 고정 — 제품이 축 바깥에 있으면 clamp (1 이상 상대점유율은 리더 영역으로 시각화)
+  const maxRel = Math.max(2.0, ...positions.map((p) => p.relativeShare));
+  const xMax = Math.min(3.0, Math.ceil(maxRel * 2) / 2);
+  const yMin = -5;
+  const yMax = Math.max(15, ...positions.map((p) => p.growth + 2));
+
+  const chartData = positions.map((p) => ({
+    x: Math.min(p.relativeShare, xMax),
+    y: p.growth,
+    z: Math.max(50, Math.min(400, p.revenueB * 60 + 80)),
+    name: `${p.productId}·${p.name}`,
+    quadrant: p.quadrant,
+    relativeShare: p.relativeShare.toFixed(2),
+    productShare: p.productShare.toFixed(1),
+    revenueB: p.revenueB.toFixed(1),
+  }));
+
+  return (
+    <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 mb-6">
+      <div className="flex items-baseline justify-between mb-2">
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--biz-text)' }}>BCG 매트릭스 — 상대점유율 × 시장성장률</h3>
+        <span className="text-[11px]" style={{ color: 'var(--biz-text-muted)' }}>버블 크기 = 제품 매출</span>
+      </div>
+      <ResponsiveContainer width="100%" height={320}>
+        <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--biz-border)" />
+          <XAxis
+            type="number"
+            dataKey="x"
+            domain={[0, xMax]}
+            label={{ value: '상대 시장점유율 (우리 / 최대 경쟁사)', position: 'insideBottomRight', offset: -10 }}
+            style={{ fontSize: '12px', fill: 'var(--biz-text-muted)' }}
+          />
+          <YAxis
+            type="number"
+            dataKey="y"
+            domain={[yMin, yMax]}
+            tickFormatter={(v) => `${v.toFixed(0)}%`}
+            label={{ value: '시장 성장률', angle: -90, position: 'insideLeft' }}
+            style={{ fontSize: '12px', fill: 'var(--biz-text-muted)' }}
+          />
+          <ZAxis type="number" dataKey="z" range={[60, 400]} />
+
+          {/* 4분면 라벨 배경 */}
+          <ReferenceArea x1={1} x2={xMax} y1={5} y2={yMax} fill="#fef3c7" fillOpacity={0.35} label={{ value: 'Star', position: 'insideTopRight', fill: '#b45309', fontSize: 11, fontWeight: 600 }} />
+          <ReferenceArea x1={1} x2={xMax} y1={yMin} y2={5} fill="#dbeafe" fillOpacity={0.35} label={{ value: 'Cash Cow', position: 'insideBottomRight', fill: '#1e40af', fontSize: 11, fontWeight: 600 }} />
+          <ReferenceArea x1={0} x2={1} y1={5} y2={yMax} fill="#ede9fe" fillOpacity={0.35} label={{ value: 'Question Mark', position: 'insideTopLeft', fill: '#6d28d9', fontSize: 11, fontWeight: 600 }} />
+          <ReferenceArea x1={0} x2={1} y1={yMin} y2={5} fill="#f1f5f9" fillOpacity={0.5} label={{ value: 'Dog', position: 'insideBottomLeft', fill: '#475569', fontSize: 11, fontWeight: 600 }} />
+
+          <ReferenceLine x={1} stroke="var(--biz-border)" strokeDasharray="5 5" />
+          <ReferenceLine y={5} stroke="var(--biz-border)" strokeDasharray="5 5" />
+
+          <Tooltip
+            cursor={{ strokeDasharray: '3 3' }}
+            contentStyle={{ background: 'var(--biz-card)', border: '1px solid var(--biz-border)', borderRadius: '6px', fontSize: '12px' }}
+            labelStyle={{ color: 'var(--biz-text)' }}
+            content={({ active, payload }) => {
+              if (!active || !payload || payload.length === 0) return null;
+              const d = payload[0].payload as typeof chartData[number];
+              return (
+                <div style={{ background: 'var(--biz-card)', border: '1px solid var(--biz-border)', borderRadius: 6, padding: 8, fontSize: 12, color: 'var(--biz-text)' }}>
+                  <div style={{ fontWeight: 600 }}>{d.name}</div>
+                  <div>상대점유율 <span style={{ fontFamily: 'monospace' }}>{d.relativeShare}</span></div>
+                  <div>시장점유율 <span style={{ fontFamily: 'monospace' }}>{d.productShare}%</span></div>
+                  <div>매출 <span style={{ fontFamily: 'monospace' }}>₩{d.revenueB}B</span></div>
+                  <div style={{ marginTop: 2, color: 'var(--biz-text-muted)', fontSize: 11 }}>{d.quadrant === 'star' ? 'Star · 공격 투자' : d.quadrant === 'cashCow' ? 'Cash Cow · 현금창출' : d.quadrant === 'questionMark' ? 'Question Mark · 선택 집중' : 'Dog · 퇴출 검토'}</div>
+                </div>
+              );
+            }}
+          />
+          <Scatter name="제품" data={chartData} fill="#0066cc" />
+        </ScatterChart>
+      </ResponsiveContainer>
+      <div className="grid grid-cols-2 gap-2 mt-2 text-[11px]" style={{ color: 'var(--biz-text-muted)' }}>
+        {positions.map((p) => (
+          <div key={p.productId} className="flex items-center justify-between border rounded px-2 py-1" style={{ borderColor: 'var(--biz-border)' }}>
+            <span style={{ color: 'var(--biz-text)', fontWeight: 600 }}>{p.productId}·{p.name}</span>
+            <span className="font-mono">rel {p.relativeShare.toFixed(2)} · g {p.growth.toFixed(1)}%</span>
+          </div>
+        ))}
       </div>
     </div>
   );

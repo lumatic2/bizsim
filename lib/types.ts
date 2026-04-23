@@ -33,14 +33,21 @@ export type ProductDecision = {
   production: number;
 };
 
+export type RdAllocation = {
+  improve: number;  // % of rdBudget → quality cap (기존 제품·시장 침투)
+  explore: number;  // % of rdBudget → 신시장 탐색 (플레이어 전용 시장 확장)
+};
+
 export type Decisions = {
   products: [ProductDecision, ProductDecision];
   rdBudget: number;
+  rdAllocation: RdAllocation;  // Ansoff: improve(quality cap) vs explore(시장 확장)
   adBudget: AdMix;
   channels: { online: number; mart: number; direct: number };
   financing: Financing;
   capexInvestment: number;  // 이번 분기 설비투자 (유형자산 증가, 다음 분기부터 capacity 반영)
   dividendPayout: number;   // 이익잉여금에서 지급하는 현금 배당 (상법 §462 배당가능이익 한도)
+  serviceCapacity: number;  // 분기 서비스 처리 능력 (A/S·상담·배송). 대당 50,000원 opex 가산
 };
 
 export type ChatMessage = {
@@ -57,6 +64,7 @@ export type CompetitorState = {
   marketShare: number;
   revenue: number;
   unitsSold: number;
+  cumulativeRd: number;  // 경쟁사 R&D 스태미나 (품질 상승 속도 결정)
 };
 
 export type EventSeverity = 'good' | 'bad' | 'neutral';
@@ -90,6 +98,7 @@ export type RoundSnapshot = {
   qualityCap: number;
   event: RoundEvent;
   brandEquity: number;
+  supplyIndex: number;
 };
 
 export type CarryForwardBS = {
@@ -117,6 +126,12 @@ export type ProductResult = {
   segmentDemand: Record<PersonaId, number>;
 };
 
+export type ServiceQueueReport = {
+  utilization: number;
+  satisfactionDelta: number;
+  overflow: number;
+};
+
 export type SimulationResults = {
   marketShare: number;
   revenue: number;
@@ -127,6 +142,7 @@ export type SimulationResults = {
   marketSize: number;
   competitors: CompetitorState[];
   perProduct: Record<ProductId, ProductResult>;
+  serviceQueue: ServiceQueueReport;
 };
 
 export type PnL = {
@@ -197,4 +213,8 @@ export type GameState = {
   currentEvent: RoundEvent;
   brandEquity: number;
   cumulativeLoss: number;  // 이월결손금 잔액 (누적 적자 - 이미 공제 사용된 분)
+  cumulativeProduction: Record<ProductId, number>;  // 제품별 누적 실제 생산량 (학습곡선 stock)
+  supplyIndex: number;  // 공급자 교섭력 지수 (Porter 5 Forces) — 1.0 기준, 원자재 가격 배수
+  cumulativeImproveRd: number;  // Ansoff improve 누적 R&D (quality cap 산출 기반)
+  cumulativeExploreRd: number;  // Ansoff explore 누적 R&D (시장 확장 부스트 기반)
 };
