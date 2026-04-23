@@ -13,6 +13,7 @@ import { exploreBoostFrom } from '@/lib/ansoff';
 import { LABOR_COST_PER_HEAD, directChannelMultiplier, rdEffectivenessMultiplier } from '@/lib/labor';
 import { economicOrderQuantity } from '@/lib/eoq';
 import { playerDemandVolatility, BULLWHIP_THRESHOLD } from '@/lib/bullwhip';
+import { orgLearningMultiplier } from '@/lib/org-learning';
 import type { ProductId } from '@/lib/types';
 
 function formatBillion(v: number) {
@@ -56,16 +57,18 @@ export default function DecisionPage() {
   const [activeTab, setActiveTab] = useState<TabId>('product');
   const capacity = productionCapacityFrom(previousBS?.ppe ?? INITIAL_PPE);
   const exploreBoost = exploreBoostFrom(cumulativeExploreRd);
+  const roundsCompleted = roundHistory.length;
+  const orgLearning = orgLearningMultiplier(roundsCompleted);
   const marketSize = getMarketSize(currentRound);
   const preview = useMemo(() => {
-    return runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost, pendingProduction, adstock);
-  }, [decisions, marketSize, competitors, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost, pendingProduction, adstock]);
+    return runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost, pendingProduction, adstock, roundsCompleted);
+  }, [decisions, marketSize, competitors, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost, pendingProduction, adstock, roundsCompleted]);
 
   // 민감도 분석: 현재 결정에서 레버를 한 단계 조정했을 때 매출·점유·만족도 변화량.
   // 각 레버당 추가 runSimulation 1회 — 순수 함수, <1ms로 렌더마다 재계산 가능.
   const runScenario = (mutator: (d: typeof decisions) => typeof decisions) => {
     const perturbed = mutator(JSON.parse(JSON.stringify(decisions)));
-    return runSimulation(perturbed, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost, pendingProduction, adstock);
+    return runSimulation(perturbed, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost, pendingProduction, adstock, roundsCompleted);
   };
 
   const sensitivity = useMemo(() => {
@@ -275,7 +278,7 @@ export default function DecisionPage() {
       )}
 
       {/* 핵심 지표 대시보드 */}
-      <div className="grid grid-cols-2 gap-2 text-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
         <div className="flex items-center gap-3 border rounded-md px-3 py-2" style={{ borderColor: 'var(--biz-border)', background: 'var(--biz-card)' }}>
           <span style={{ color: 'var(--biz-text-muted)' }}>브랜드 에쿼티</span>
           <div className="flex-1 h-2 rounded-full" style={{ background: '#e2e8f0' }}>
@@ -299,11 +302,21 @@ export default function DecisionPage() {
           <span className="ml-auto" style={{ color: 'var(--biz-text-muted)' }}>{PRESSURE_LABELS[classifyPressure(supplyIndex)]}</span>
         </div>
       </div>
-      {cumulativeLoss > 0 && (
-        <div className="text-[11px] px-3 py-1 rounded border" style={{ borderColor: 'var(--biz-border)', color: 'var(--biz-text-muted)', background: 'var(--biz-card)' }} title="이월결손금 — 다음 흑자 분기부터 과세표준에서 차감됨">
-          이월결손금 <span className="font-mono" style={{ color: 'var(--biz-text)' }}>₩{formatBillion(cumulativeLoss)}B</span> (다음 흑자 분기 과세표준 차감 예정)
+      <div className="flex items-center gap-3 flex-wrap">
+        <div
+          className="text-[11px] px-3 py-1 rounded border"
+          style={{ borderColor: 'var(--biz-border)', color: 'var(--biz-text-muted)', background: roundsCompleted > 0 ? '#ecfdf5' : 'var(--biz-card)' }}
+          title="조직 학습 — 운영 경험이 누적되어 전 부문 원가 효율성이 상승. 라운드당 +1%, 최대 +30%."
+        >
+          조직 학습 <span className="font-mono" style={{ color: 'var(--biz-text)' }}>×{orgLearning.toFixed(3)}</span>
+          <span className="ml-1 opacity-75">(누적 {roundsCompleted}라운드 · 전 부문 원가 −{((orgLearning - 1) * 100).toFixed(1)}%)</span>
         </div>
-      )}
+        {cumulativeLoss > 0 && (
+          <div className="text-[11px] px-3 py-1 rounded border" style={{ borderColor: 'var(--biz-border)', color: 'var(--biz-text-muted)', background: 'var(--biz-card)' }} title="이월결손금 — 다음 흑자 분기부터 과세표준에서 차감됨">
+            이월결손금 <span className="font-mono" style={{ color: 'var(--biz-text)' }}>₩{formatBillion(cumulativeLoss)}B</span> (다음 흑자 분기 과세표준 차감 예정)
+          </div>
+        )}
+      </div>
       {projectedVolatility > BULLWHIP_THRESHOLD && (
         <div
           className="text-[11px] px-3 py-1.5 rounded border-l-4"
@@ -319,8 +332,8 @@ export default function DecisionPage() {
       {/* 본문: 탭 + 프리뷰 */}
       <div className="grid gap-4 lg:grid-cols-[2fr_3fr]">
         <div className="space-y-3">
-          {/* 탭 바 */}
-          <div className="flex gap-1 border rounded-lg p-1" style={{ borderColor: 'var(--biz-border)', background: 'var(--biz-card)' }}>
+          {/* 탭 바 — 모바일에선 가로 스크롤 가능 */}
+          <div className="flex gap-1 border rounded-lg p-1 overflow-x-auto" style={{ borderColor: 'var(--biz-border)', background: 'var(--biz-card)' }}>
             {TAB_META.map((t) => {
               const issue = tabIssues[t.id];
               const active = activeTab === t.id;
@@ -328,7 +341,7 @@ export default function DecisionPage() {
                 <button
                   key={t.id}
                   onClick={() => setActiveTab(t.id)}
-                  className="flex-1 px-2 py-1.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                  className="flex-1 min-w-[60px] px-2 py-2 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
                   style={{
                     background: active ? 'var(--biz-primary)' : 'transparent',
                     color: active ? 'white' : 'var(--biz-text-muted)',

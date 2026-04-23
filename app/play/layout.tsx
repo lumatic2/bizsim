@@ -21,5 +21,5 @@ export default function PlayLayout({ children }: { children: React.ReactNode }) 
     );
   }
 
-  return <>{children}</>;
+  return <div className="px-3 sm:px-4 md:px-6 pb-8">{children}</div>;
 }

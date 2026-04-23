@@ -10,7 +10,10 @@ import { computeBCGPositions } from '@/lib/bcg';
 import { computeCLV } from '@/lib/clv';
 import { computeDelta, topAttribution } from '@/lib/round-delta';
 import { analyzeCompetitor } from '@/lib/competitor-trend';
-import type { SimulationResults, Decisions, RoundSnapshot } from '@/lib/types';
+import { matchFrameworkTags } from '@/lib/framework-tags';
+import { computeSegmentProfiles } from '@/lib/stp';
+import { computeMM1 } from '@/lib/mm1-metrics';
+import type { SimulationResults, Decisions, RoundSnapshot, ProductId } from '@/lib/types';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea, ResponsiveContainer, ZAxis } from 'recharts';
 
 function formatKRW(value: number): string {
@@ -57,7 +60,7 @@ export default function ResultsPage() {
         {currentRound}분기 경영 시뮬레이션의 최종 결과입니다.
       </p>
 
-      <div className="grid grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <MetricCard label="시장점유율" value={`${results.marketShare}%`} delta={`Round ${currentRound}`} deltaUp />
         <MetricCard label="매출" value={formatKRW(results.revenue)} delta={`Round ${currentRound}`} deltaUp={results.revenue > 0} />
         <MetricCard
@@ -68,6 +71,17 @@ export default function ResultsPage() {
         />
         <MetricCard label="고객 만족도" value={`${results.satisfaction}`} delta="/100" deltaUp={results.satisfaction > 50} />
       </div>
+
+      {/* 경영학 프레임워크 태그 */}
+      <FrameworkTagsPanel
+        results={results}
+        decisions={decisions}
+        roundHistory={roundHistory}
+        brandEquity={brandEquity}
+        supplyIndex={supplyIndex}
+        cumulativeProduction={cumulativeProduction}
+        cumulativeExploreRd={cumulativeExploreRd}
+      />
 
       {/* 라운드 간 변화 카드 */}
       {previousResults && (
@@ -85,7 +99,10 @@ export default function ResultsPage() {
       <CLVCard results={results} brandEquity={brandEquity} />
 
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      {/* STP (S·T): 세분화 + 타겟팅 */}
+      <STPCard results={results} decisions={decisions} />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div>
           <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--biz-text)' }}>세그먼트별 판매량</h3>
           <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 space-y-3">
@@ -208,6 +225,9 @@ export default function ResultsPage() {
           </ScatterChart>
         </ResponsiveContainer>
       </div>
+
+      {/* 서비스 큐 드릴다운 (M/M/1 해석) */}
+      <ServiceQueueDrilldown results={results} decisions={decisions} />
 
       {/* 경쟁사 프로파일 드릴다운 — 전략 추이 + 태그 */}
       <CompetitorProfiles results={results} roundHistory={roundHistory} />
@@ -348,6 +368,202 @@ export default function ResultsPage() {
   );
 }
 
+function STPCard({ results, decisions }: { results: SimulationResults; decisions: Decisions }) {
+  const profiles = useMemo(() => computeSegmentProfiles(results, decisions), [results, decisions]);
+  const channelLabels: Record<'search' | 'display' | 'influencer', string> = {
+    search: '검색', display: '디스플레이', influencer: '인플루언서',
+  };
+  const totalAd = decisions.adBudget.search + decisions.adBudget.display + decisions.adBudget.influencer;
+  // 실제 광고 믹스와 topChannel 일치 여부 — 타겟팅 정합성
+  const actualTopChannel = (['search', 'display', 'influencer'] as const).reduce(
+    (best, ch) => (decisions.adBudget[ch] > decisions.adBudget[best] ? ch : best),
+    'search' as const,
+  );
+
+  return (
+    <div className="border rounded-lg p-4 mb-4" style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }}>
+      <div className="flex items-baseline justify-between mb-3">
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--biz-text)' }}>STP 분석 — 세분화·타겟팅</h3>
+        <span className="text-[11px]" style={{ color: 'var(--biz-text-muted)' }}>매력도 = 규모 + 획득률</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        {profiles.map((p) => {
+          const isTopMatch = p.topChannel === actualTopChannel;
+          return (
+            <div key={p.personaId} className="border rounded p-3" style={{ borderColor: 'var(--biz-border)' }}>
+              <div className="flex items-baseline justify-between mb-1.5">
+                <span className="text-sm" style={{ color: 'var(--biz-text)' }}>{p.emoji} {p.name}</span>
+                <span className="text-[10px] font-mono" style={{ color: 'var(--biz-text-muted)' }}>매력도 {p.attractiveness}/100</span>
+              </div>
+              <div className="text-[10px] mb-2" style={{ color: 'var(--biz-text-muted)' }}>{p.description}</div>
+
+              <div className="space-y-1.5 text-[11px]">
+                <div className="flex items-center justify-between">
+                  <span style={{ color: 'var(--biz-text-muted)' }}>세그먼트 규모</span>
+                  <span className="font-mono" style={{ color: 'var(--biz-text)' }}>{p.segmentSize.toLocaleString()}대</span>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span style={{ color: 'var(--biz-text-muted)' }}>획득률</span>
+                    <span className="font-mono" style={{ color: 'var(--biz-text)' }}>{(p.captureRate * 100).toFixed(1)}%</span>
+                  </div>
+                  <div style={{ background: '#e2e8f0' }} className="h-1.5 rounded-full">
+                    <div style={{ background: 'var(--biz-primary)', width: `${Math.min(100, p.captureRate * 100)}%` }} className="h-1.5 rounded-full" />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span style={{ color: 'var(--biz-text-muted)' }}>광고 도달</span>
+                    <span className="font-mono" style={{ color: 'var(--biz-text)' }}>{(p.adReachScore * 100).toFixed(0)}%</span>
+                  </div>
+                  <div style={{ background: '#e2e8f0' }} className="h-1.5 rounded-full">
+                    <div style={{ background: '#f59e0b', width: `${p.adReachScore * 100}%` }} className="h-1.5 rounded-full" />
+                  </div>
+                </div>
+                <div
+                  className="flex items-center justify-between mt-1 text-[10px] px-1.5 py-0.5 rounded"
+                  style={{ background: isTopMatch ? '#ecfdf5' : '#fff7ed', color: isTopMatch ? '#047857' : '#b45309' }}
+                  title="이 페르소나에 가장 효과적인 채널 vs 현재 광고 믹스 최대 채널"
+                >
+                  <span>타겟: {channelLabels[p.topChannel]}</span>
+                  <span>{isTopMatch ? '✓ 일치' : '⚠ 다른 채널 과다'}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 text-[11px] px-3 py-1.5 rounded" style={{ background: 'var(--biz-primary-light)', color: 'var(--biz-text-muted)' }}>
+        총 광고 ₩{(totalAd / 1_000_000_000).toFixed(1)}B · 현재 최대 투입: <span style={{ color: 'var(--biz-text)', fontWeight: 600 }}>{channelLabels[actualTopChannel]}</span>
+        <span className="ml-2">— 포지셔닝 맵은 아래 "Economy × Performance" 차트 참조</span>
+      </div>
+    </div>
+  );
+}
+
+function FrameworkTagsPanel({ results, decisions, roundHistory, brandEquity, supplyIndex, cumulativeProduction, cumulativeExploreRd }: {
+  results: SimulationResults;
+  decisions: Decisions;
+  roundHistory: RoundSnapshot[];
+  brandEquity: number;
+  supplyIndex: number;
+  cumulativeProduction: Record<ProductId, number>;
+  cumulativeExploreRd: number;
+}) {
+  const tags = useMemo(
+    () => matchFrameworkTags({ decisions, results, roundHistory, brandEquity, supplyIndex, cumulativeProduction, cumulativeExploreRd }),
+    [decisions, results, roundHistory, brandEquity, supplyIndex, cumulativeProduction, cumulativeExploreRd],
+  );
+  if (tags.length === 0) return null;
+  const top = tags.slice(0, 5);
+
+  const categoryLabel: Record<string, string> = {
+    porter: 'Porter', bcg: 'BCG', ansoff: 'Ansoff',
+    experience: '경험곡선', marketing: '마케팅', ops: '운영', finance: '재무',
+  };
+
+  return (
+    <div className="border rounded-lg p-4 mb-4" style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }}>
+      <div className="flex items-baseline justify-between mb-3">
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--biz-text)' }}>경영학 프레임워크 관점</h3>
+        <span className="text-[11px]" style={{ color: 'var(--biz-text-muted)' }}>자동 매칭 · 이번 분기 상위 {top.length}개</span>
+      </div>
+      <div className="space-y-1.5">
+        {top.map((t) => (
+          <div
+            key={t.id}
+            className="flex items-start gap-2 text-[11px] px-2 py-1.5 rounded border"
+            style={{
+              borderColor: 'var(--biz-border)',
+              background: t.sentiment === 'positive' ? '#ecfdf5' : t.sentiment === 'warning' ? '#fff7ed' : 'var(--biz-primary-light)',
+            }}
+          >
+            <span
+              className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded flex-shrink-0"
+              style={{
+                background: 'rgba(0,0,0,0.05)',
+                color: t.sentiment === 'positive' ? '#047857' : t.sentiment === 'warning' ? '#b45309' : '#1d4ed8',
+              }}
+            >
+              {categoryLabel[t.category] ?? t.category}
+            </span>
+            <span style={{ color: 'var(--biz-text)', fontWeight: 600 }}>{t.label}</span>
+            <span style={{ color: 'var(--biz-text-muted)' }}>— {t.insight}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ServiceQueueDrilldown({ results, decisions }: { results: SimulationResults; decisions: Decisions }) {
+  const metrics = useMemo(
+    () => computeMM1(results.unitsSold, decisions.serviceCapacity),
+    [results.unitsSold, decisions.serviceCapacity],
+  );
+  const stable = metrics.utilization < 1;
+
+  return (
+    <div className="border rounded-lg p-4 mb-4" style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }}>
+      <div className="flex items-baseline justify-between mb-3">
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--biz-text)' }}>서비스 큐 드릴다운 — M/M/1 해석</h3>
+        <a href="/lab/queue" target="_blank" rel="noopener noreferrer" className="text-[11px] underline" style={{ color: 'var(--biz-text-muted)' }}>
+          discrete-event 시뮬 열기 →
+        </a>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-3 text-[11px]">
+        <Stat label="ρ utilization" value={metrics.utilization === Infinity ? '∞' : metrics.utilization.toFixed(3)} />
+        <Stat label="L 시스템 평균 인원" value={stable ? metrics.systemSize.toFixed(2) : '발산'} />
+        <Stat label="Lq 대기열 평균" value={stable ? metrics.queueSize.toFixed(2) : '발산'} />
+        <Stat label="W 체류시간 (배수)" value={stable ? metrics.systemTime.toFixed(2) : '발산'} unit="× 서비스시간" />
+        <Stat label="Wq 대기시간 (배수)" value={stable ? metrics.queueTime.toFixed(2) : '발산'} unit="× 서비스시간" />
+      </div>
+
+      {stable ? (
+        <div>
+          <div className="text-[11px] mb-1" style={{ color: 'var(--biz-text-muted)' }}>
+            시스템 내 k명 확률분포 P(N=k) — 기하분포 (1−ρ)·ρ^k
+          </div>
+          <div className="flex gap-1 items-end h-16">
+            {metrics.distribution.map((d) => (
+              <div key={d.k} className="flex-1 flex flex-col items-center">
+                <div
+                  className="w-full rounded-t"
+                  style={{
+                    background: d.k === 0 ? '#10b981' : d.k < 3 ? 'var(--biz-primary)' : '#94a3b8',
+                    height: `${Math.max(2, d.probability * 200)}%`,
+                  }}
+                  title={`P(N=${d.k}) = ${(d.probability * 100).toFixed(2)}%`}
+                />
+                <span className="text-[9px] mt-0.5" style={{ color: 'var(--biz-text-muted)' }}>{d.k}</span>
+              </div>
+            ))}
+          </div>
+          <div className="text-[10px] mt-2" style={{ color: 'var(--biz-text-muted)' }}>
+            시스템 비어있음 P(0) = {(metrics.distribution[0].probability * 100).toFixed(1)}% ·
+            평균적으로 {metrics.systemSize.toFixed(1)}명이 이 서비스 채널에 붙어있음
+          </div>
+        </div>
+      ) : (
+        <div className="text-[11px] px-3 py-2 rounded" style={{ background: '#fef2f2', color: '#b91c1c' }}>
+          ρ ≥ 1 포화 상태 — 수요가 처리능력을 초과해 대기열이 무한 팽창. serviceCapacity 증설 또는 판매 조절 필요.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stat({ label, value, unit }: { label: string; value: string; unit?: string }) {
+  return (
+    <div className="border rounded px-2 py-1.5" style={{ borderColor: 'var(--biz-border)' }}>
+      <div className="text-[10px]" style={{ color: 'var(--biz-text-muted)' }}>{label}</div>
+      <div className="text-sm font-mono font-semibold" style={{ color: 'var(--biz-text)' }}>{value}</div>
+      {unit && <div className="text-[9px]" style={{ color: 'var(--biz-text-muted)' }}>{unit}</div>}
+    </div>
+  );
+}
+
 function CompetitorProfiles({ results, roundHistory }: { results: SimulationResults; roundHistory: RoundSnapshot[] }) {
   const trends = useMemo(
     () => results.competitors.map((c) => analyzeCompetitor(c.name, roundHistory, c)),
@@ -361,7 +577,7 @@ function CompetitorProfiles({ results, roundHistory }: { results: SimulationResu
         <h3 className="text-sm font-semibold" style={{ color: 'var(--biz-text)' }}>경쟁사 프로파일 드릴다운</h3>
         <span className="text-[11px]" style={{ color: 'var(--biz-text-muted)' }}>라운드 추이 + 전략 태그</span>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         {trends.map((t, i) => {
           const latest = results.competitors[i];
           return (
@@ -476,7 +692,7 @@ function RoundChangeCard({ cur, prev, curDecisions, prevDecisions, curEvent, sup
           </span>
         )}
       </div>
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
         <Item label="점유율" value={d.marketShare} digits={1} suffix="%p" />
         <Item label="매출" value={d.revenueB} digits={1} suffix="B" />
         <Item label="영업이익" value={d.operatingProfitB} digits={1} suffix="B" />
@@ -508,7 +724,7 @@ function CLVCard({ results, brandEquity }: CLVCardProps) {
         <h3 className="text-sm font-semibold" style={{ color: 'var(--biz-text)' }}>Customer Lifetime Value (CLV)</h3>
         <span className="text-[11px]" style={{ color: 'var(--biz-text-muted)' }}>평균 객단가 × 기대 재구매 횟수</span>
       </div>
-      <div className="grid grid-cols-4 gap-3 text-sm">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
         <div style={{ background: 'var(--biz-primary-light)', borderColor: 'var(--biz-border)' }} className="border rounded-md p-3">
           <div className="text-[11px]" style={{ color: 'var(--biz-text-muted)' }}>CLV</div>
           <div className="text-xl font-[Manrope] font-bold" style={{ color: 'var(--biz-primary)' }}>

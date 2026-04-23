@@ -5,6 +5,7 @@ import { learningCurveMultiplier } from './learning-curve';
 import { SERVICE_COST_PER_UNIT } from './service-queue';
 import { laborCostOf, G_AND_A_BASELINE, MAINTENANCE_RATE } from './labor';
 import { inventoryHoldingCostOf } from './eoq';
+import { orgLearningMultiplier } from './org-learning';
 
 const INITIAL_CASH = 10_000_000_000;
 const INITIAL_EQUITY = 8_000_000_000;
@@ -29,24 +30,26 @@ export function generateFinancials(
   carryforwardLoss: number = 0,
   cumulativeProduction: Record<ProductId, number> = { A: 0, B: 0 },
   supplyIndex: number = 1,
+  roundsCompleted: number = 0,
 ): FinancialStatements {
-  const pnl = generatePnL(decisions, results, event, previousBS, carryforwardLoss, cumulativeProduction, supplyIndex);
+  const pnl = generatePnL(decisions, results, event, previousBS, carryforwardLoss, cumulativeProduction, supplyIndex, roundsCompleted);
   const prevRetained = previousBS?.retainedEarnings ?? 0;
   const distributable = Math.max(0, prevRetained + pnl.netIncome);
   const dividendPaid = Math.min(Math.max(0, decisions.dividendPayout), distributable);
 
-  const bs = generateBS(decisions, results, pnl, previousBS, event, dividendPaid, cumulativeProduction, supplyIndex);
+  const bs = generateBS(decisions, results, pnl, previousBS, event, dividendPaid, cumulativeProduction, supplyIndex, roundsCompleted);
   const cf = generateCF(decisions, pnl, dividendPaid);
   return { pnl, bs, cf };
 }
 
-function generatePnL(decisions: Decisions, results: SimulationResults, event: RoundEvent, previousBS: CarryForwardBS | null | undefined, carryforwardLoss: number, cumulativeProduction: Record<ProductId, number>, supplyIndex: number): PnL {
+function generatePnL(decisions: Decisions, results: SimulationResults, event: RoundEvent, previousBS: CarryForwardBS | null | undefined, carryforwardLoss: number, cumulativeProduction: Record<ProductId, number>, supplyIndex: number, roundsCompleted: number): PnL {
   const revenue = results.revenue;
   const costMult = event.effects.costMultiplier ?? 1;
+  const orgLearning = orgLearningMultiplier(roundsCompleted);
   const cogs = decisions.products.reduce((sum, p) => {
     const pr = results.perProduct[p.id];
     const learningMult = learningCurveMultiplier(cumulativeProduction[p.id] ?? 0);
-    const unitCost = Math.round((120_000 + (p.quality - 1) * 25_000) * costMult * learningMult * supplyIndex);
+    const unitCost = Math.round((120_000 + (p.quality - 1) * 25_000) * costMult * learningMult * supplyIndex / orgLearning);
     return sum + pr.unitsSold * unitCost;
   }, 0);
   const grossProfit = revenue - cogs;
@@ -59,12 +62,12 @@ function generatePnL(decisions: Decisions, results: SimulationResults, event: Ro
   const laborCost = laborCostOf(decisions.headcount);
   const maintenanceCost = Math.round(prevPpe * MAINTENANCE_RATE);
   const serviceCost = decisions.serviceCapacity * SERVICE_COST_PER_UNIT;
-  // 기말 재고 평가: (produced - sold) × unit cost (학습곡선·공급지수 적용)
+  // 기말 재고 평가: (produced - sold) × unit cost (학습곡선·공급지수·조직학습 적용)
   const endInventoryValue = decisions.products.reduce((sum, p) => {
     const pr = results.perProduct[p.id];
     const unsold = Math.max(0, pr.produced - pr.unitsSold);
     const learningMult = learningCurveMultiplier(cumulativeProduction[p.id] ?? 0);
-    const unitCost = Math.round((120_000 + (p.quality - 1) * 25_000) * (event.effects.costMultiplier ?? 1) * learningMult * supplyIndex);
+    const unitCost = Math.round((120_000 + (p.quality - 1) * 25_000) * (event.effects.costMultiplier ?? 1) * learningMult * supplyIndex / orgLearning);
     return sum + unsold * unitCost;
   }, 0);
   const inventoryHoldingCost = inventoryHoldingCostOf(endInventoryValue);
@@ -101,7 +104,7 @@ function generatePnL(decisions: Decisions, results: SimulationResults, event: Ro
   };
 }
 
-function generateBS(decisions: Decisions, results: SimulationResults, pnl: PnL, previousBS: CarryForwardBS | null | undefined, event: RoundEvent, dividendPaid: number, cumulativeProduction: Record<ProductId, number>, supplyIndex: number): BalanceSheet {
+function generateBS(decisions: Decisions, results: SimulationResults, pnl: PnL, previousBS: CarryForwardBS | null | undefined, event: RoundEvent, dividendPaid: number, cumulativeProduction: Record<ProductId, number>, supplyIndex: number, roundsCompleted: number): BalanceSheet {
   const prevCash = previousBS?.cash ?? INITIAL_CASH;
   const prevDebt = previousBS?.debt ?? INITIAL_DEBT;
   const prevEquity = previousBS?.equity ?? INITIAL_EQUITY;
@@ -115,11 +118,12 @@ function generateBS(decisions: Decisions, results: SimulationResults, pnl: PnL, 
   const { newDebt, newEquity } = decisions.financing;
 
   const costMult = event.effects.costMultiplier ?? 1;
+  const orgLearning = orgLearningMultiplier(roundsCompleted);
   const inventory = decisions.products.reduce((sum, p) => {
     const pr = results.perProduct[p.id];
     const unsold = Math.max(0, pr.produced - pr.unitsSold);
     const learningMult = learningCurveMultiplier(cumulativeProduction[p.id] ?? 0);
-    const unitCost = Math.round((120_000 + (p.quality - 1) * 25_000) * costMult * learningMult * supplyIndex);
+    const unitCost = Math.round((120_000 + (p.quality - 1) * 25_000) * costMult * learningMult * supplyIndex / orgLearning);
     return sum + unsold * unitCost;
   }, 0);
   const receivables = Math.round(pnl.revenue * 0.15);

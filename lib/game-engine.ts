@@ -5,6 +5,7 @@ import { learningCurveMultiplier } from './learning-curve';
 import { serviceQueueImpact, SERVICE_COST_PER_UNIT } from './service-queue';
 import { combineAdstock, EMPTY_ADSTOCK } from './adstock';
 import { directChannelMultiplier, laborCostOf, G_AND_A_BASELINE, MAINTENANCE_RATE } from './labor';
+import { orgLearningMultiplier } from './org-learning';
 
 const BASE_PRICE = 349_000;
 const BASE_QUALITY = 3;
@@ -63,8 +64,8 @@ function calculateSegmentDemand(
   return result as Record<PersonaId, number>;
 }
 
-function unitCostFor(quality: number, costMultiplier: number, learningMultiplier: number = 1, supplyIndex: number = 1): number {
-  return Math.round((120_000 + (quality - 1) * 25_000) * costMultiplier * learningMultiplier * supplyIndex);
+function unitCostFor(quality: number, costMultiplier: number, learningMultiplier: number = 1, supplyIndex: number = 1, orgLearning: number = 1): number {
+  return Math.round((120_000 + (quality - 1) * 25_000) * costMultiplier * learningMultiplier * supplyIndex / orgLearning);
 }
 
 export function runSimulation(
@@ -84,6 +85,7 @@ export function runSimulation(
     B: decisions.products[1].production,
   },
   prevAdstock: AdMix = EMPTY_ADSTOCK,
+  roundsCompleted: number = 0,  // 조직 학습 누적 라운드 수 (초회는 0)
 ): SimulationResults {
   const effects = event.effects;
   const effectiveMarketSize = Math.round(marketSize * (effects.marketSizeMultiplier ?? 1));
@@ -140,7 +142,8 @@ export function runSimulation(
     // 학습곡선: 기초 누적생산량 기준으로 이번 분기 unit cost 체감 계수 결정.
     // (이번 분기 생산 전 stock으로 계산 → 분기 내 비선형 효과는 근사 생략, 제품별 독립 적용)
     const learningMult = learningCurveMultiplier(cumulativeProduction[product.id] ?? 0);
-    const unitCost = unitCostFor(effectiveQuality, costMultiplier, learningMult, supplyIndex);
+    const orgLearning = orgLearningMultiplier(roundsCompleted);
+    const unitCost = unitCostFor(effectiveQuality, costMultiplier, learningMult, supplyIndex, orgLearning);
     const productCogs = unitsSold * unitCost;
     totalCogs += productCogs;
     totalUnitsSold += unitsSold;

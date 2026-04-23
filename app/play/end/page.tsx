@@ -90,7 +90,7 @@ export default function GameEndPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <MetricCard
           label="누적 매출"
           value={formatKRW(totalRevenue)}
@@ -124,6 +124,8 @@ export default function GameEndPage() {
         cachedText={finalDebrief ?? undefined}
         onComplete={(text) => setFinalDebrief(text)}
       />
+
+      <DecisionTimeline roundHistory={roundHistory} />
 
       <div
         style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }}
@@ -215,6 +217,147 @@ export default function GameEndPage() {
         >
           새 게임 시작 →
         </button>
+      </div>
+    </div>
+  );
+}
+
+type DecisionTimelineProps = {
+  roundHistory: import('@/lib/types').RoundSnapshot[];
+};
+
+function DecisionTimeline({ roundHistory }: DecisionTimelineProps) {
+  const rows = useMemo(() => {
+    return roundHistory.map((r) => {
+      const avgPrice = r.decisions.products.reduce((s, p) => s + p.price, 0) / r.decisions.products.length;
+      const avgQuality = r.decisions.products.reduce((s, p) => s + p.quality, 0) / r.decisions.products.length;
+      const totalAd = r.decisions.adBudget.search + r.decisions.adBudget.display + r.decisions.adBudget.influencer;
+      return {
+        round: r.round,
+        avgPrice,
+        avgQuality,
+        totalAd,
+        rdBudget: r.decisions.rdBudget,
+        improvePct: r.decisions.rdAllocation.improve,
+        serviceCapacity: r.decisions.serviceCapacity,
+        headcount: r.decisions.headcount.sales + r.decisions.headcount.rd,
+        brandEquity: r.brandEquity,
+        supplyIndex: r.supplyIndex,
+        profitB: r.results.operatingProfit / 1_000_000_000,
+        shareChange: r.results.marketShare,
+        event: r.event,
+      };
+    });
+  }, [roundHistory]);
+
+  // heatmap 색상: value / maxAbs 0-1 → green ↔ red
+  const maxProfit = Math.max(...rows.map((r) => Math.abs(r.profitB)), 0.01);
+  const profitColor = (v: number) => {
+    const intensity = Math.min(1, Math.abs(v) / maxProfit);
+    if (v > 0) return `rgba(16, 185, 129, ${0.15 + intensity * 0.4})`;
+    return `rgba(239, 68, 68, ${0.15 + intensity * 0.4})`;
+  };
+
+  return (
+    <div className="border rounded-lg p-4 mb-6" style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }}>
+      <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--biz-text)' }}>
+        분기별 의사결정 · 성과 타임라인
+      </h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[11px]">
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--biz-border)' }}>
+              <th className="text-left px-2 py-1.5" style={{ color: 'var(--biz-text-muted)' }}>분기</th>
+              <th className="text-right px-2 py-1.5" style={{ color: 'var(--biz-text-muted)' }}>평균가</th>
+              <th className="text-right px-2 py-1.5" style={{ color: 'var(--biz-text-muted)' }}>평균품질</th>
+              <th className="text-right px-2 py-1.5" style={{ color: 'var(--biz-text-muted)' }}>광고</th>
+              <th className="text-right px-2 py-1.5" style={{ color: 'var(--biz-text-muted)' }}>R&D</th>
+              <th className="text-right px-2 py-1.5" style={{ color: 'var(--biz-text-muted)' }}>개선%</th>
+              <th className="text-right px-2 py-1.5" style={{ color: 'var(--biz-text-muted)' }}>서비스</th>
+              <th className="text-right px-2 py-1.5" style={{ color: 'var(--biz-text-muted)' }}>인력</th>
+              <th className="text-right px-2 py-1.5" style={{ color: 'var(--biz-text-muted)' }}>브랜드</th>
+              <th className="text-right px-2 py-1.5" style={{ color: 'var(--biz-text-muted)' }}>SPI</th>
+              <th className="text-right px-2 py-1.5" style={{ color: 'var(--biz-text-muted)' }}>영업이익</th>
+              <th className="text-right px-2 py-1.5" style={{ color: 'var(--biz-text-muted)' }}>점유</th>
+              <th className="text-left px-2 py-1.5" style={{ color: 'var(--biz-text-muted)' }}>이벤트</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => {
+              const prev = i > 0 ? rows[i - 1] : null;
+              const priceChanged = prev && Math.abs(r.avgPrice - prev.avgPrice) > 5_000;
+              const qualityChanged = prev && r.avgQuality !== prev.avgQuality;
+              const adChanged = prev && Math.abs(r.totalAd - prev.totalAd) > 100_000_000;
+              const serviceChanged = prev && r.serviceCapacity !== prev.serviceCapacity;
+              const headcountChanged = prev && r.headcount !== prev.headcount;
+              const improveChanged = prev && r.improvePct !== prev.improvePct;
+
+              const chip = (changed: boolean | null) => changed ? { background: '#fff7ed', fontWeight: 600 } : {};
+
+              return (
+                <tr key={r.round} style={{ borderBottom: '1px solid var(--biz-border)' }}>
+                  <td className="px-2 py-1.5 font-semibold" style={{ color: 'var(--biz-text)' }}>R{r.round}</td>
+                  <td className="text-right px-2 py-1.5 font-mono" style={{ ...chip(priceChanged), color: 'var(--biz-text)' }}>
+                    {(r.avgPrice / 10_000).toFixed(0)}만
+                  </td>
+                  <td className="text-right px-2 py-1.5 font-mono" style={{ ...chip(qualityChanged), color: 'var(--biz-text)' }}>
+                    {r.avgQuality.toFixed(1)}
+                  </td>
+                  <td className="text-right px-2 py-1.5 font-mono" style={{ ...chip(adChanged), color: 'var(--biz-text)' }}>
+                    {(r.totalAd / 1_000_000_000).toFixed(1)}B
+                  </td>
+                  <td className="text-right px-2 py-1.5 font-mono" style={{ color: 'var(--biz-text)' }}>
+                    {(r.rdBudget / 1_000_000_000).toFixed(1)}B
+                  </td>
+                  <td className="text-right px-2 py-1.5 font-mono" style={{ ...chip(improveChanged), color: 'var(--biz-text)' }}>
+                    {r.improvePct}%
+                  </td>
+                  <td className="text-right px-2 py-1.5 font-mono" style={{ ...chip(serviceChanged), color: 'var(--biz-text)' }}>
+                    {(r.serviceCapacity / 1000).toFixed(0)}k
+                  </td>
+                  <td className="text-right px-2 py-1.5 font-mono" style={{ ...chip(headcountChanged), color: 'var(--biz-text)' }}>
+                    {r.headcount}명
+                  </td>
+                  <td className="text-right px-2 py-1.5 font-mono" style={{ color: 'var(--biz-text)' }}>
+                    {r.brandEquity.toFixed(0)}
+                  </td>
+                  <td
+                    className="text-right px-2 py-1.5 font-mono"
+                    style={{
+                      background: r.supplyIndex > 1.1 ? '#fef2f2' : r.supplyIndex < 0.95 ? '#ecfdf5' : 'transparent',
+                      color: 'var(--biz-text)',
+                    }}
+                  >
+                    ×{r.supplyIndex.toFixed(2)}
+                  </td>
+                  <td className="text-right px-2 py-1.5 font-mono" style={{ background: profitColor(r.profitB), color: 'var(--biz-text)' }}>
+                    {r.profitB >= 0 ? '+' : ''}{r.profitB.toFixed(1)}B
+                  </td>
+                  <td className="text-right px-2 py-1.5 font-mono" style={{ color: 'var(--biz-text)' }}>
+                    {r.shareChange}%
+                  </td>
+                  <td className="px-2 py-1.5 text-[10px]" style={{ color: 'var(--biz-text-muted)' }}>
+                    {r.event.id !== 'calm' ? (
+                      <span
+                        className="px-1 py-0.5 rounded"
+                        style={{
+                          background: r.event.severity === 'good' ? '#ecfdf5' : '#fef2f2',
+                          color: r.event.severity === 'good' ? '#047857' : '#b91c1c',
+                        }}
+                      >
+                        {r.event.title}
+                      </span>
+                    ) : '—'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-2 text-[10px]" style={{ color: 'var(--biz-text-muted)' }}>
+        <span style={{ background: '#fff7ed', padding: '1px 4px', borderRadius: 2 }}>하이라이트</span> = 이전 분기 대비 변경된 결정
+        · 영업이익 셀 색상 = 흑자(녹색)/적자(적색) 강도
       </div>
     </div>
   );

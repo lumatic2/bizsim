@@ -14,7 +14,7 @@ import { SERVER_ERROR_MESSAGE } from '@/lib/errors';
 export default function InterviewPage() {
   const router = useRouter();
   const {
-    decisions, chatHistories, selectedPersona, competitors, currentRound, qualityCap, previousBS, currentEvent, brandEquity, cumulativeLoss, cumulativeProduction, supplyIndex, cumulativeExploreRd, pendingProduction, adstock,
+    decisions, chatHistories, selectedPersona, competitors, currentRound, qualityCap, previousBS, currentEvent, brandEquity, cumulativeLoss, cumulativeProduction, supplyIndex, cumulativeExploreRd, pendingProduction, adstock, roundHistory,
     setSelectedPersona, addMessage, appendToLastAssistant,
     setResults, setFinancials,
   } = useGameStore();
@@ -66,9 +66,10 @@ export default function InterviewPage() {
     const marketSize = getMarketSize(currentRound);
     const capacity = productionCapacityFrom(previousBS?.ppe ?? INITIAL_PPE);
     const exploreBoost = exploreBoostFrom(cumulativeExploreRd);
-    const results = runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost, pendingProduction, adstock);
+    const roundsCompleted = roundHistory.length;
+    const results = runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity, capacity, cumulativeProduction, supplyIndex, exploreBoost, pendingProduction, adstock, roundsCompleted);
     setResults(results);
-    const financials = generateFinancials(decisions, results, previousBS, currentEvent, cumulativeLoss, cumulativeProduction, supplyIndex);
+    const financials = generateFinancials(decisions, results, previousBS, currentEvent, cumulativeLoss, cumulativeProduction, supplyIndex, roundsCompleted);
     setFinancials(financials);
     router.push('/play/results');
   };

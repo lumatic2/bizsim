@@ -1,6 +1,6 @@
 # BizSim Roadmap
 
-마지막 업데이트: 2026-04-24 (3)
+마지막 업데이트: 2026-04-24 (4)
 정체성: **경영학 이론 기반 심화 시뮬**로서의 완성도 우선 (2026-04-23 재전환, 직전 "포트폴리오·배포 우선" 노선 대체)
 비전: 재무·세무회계, 전략론(Porter/BCG/Ansoff), 운영관리(Queueing/EOQ), 고급 마케팅, 조직경제학이 실제 레버·동학으로 녹아있는 시뮬레이션
 
@@ -20,20 +20,19 @@
 - Phase D 재무·세무회계 완성 (2026-04-23): 법인세·R&D 세액공제·CAPEX·결손금 이월 + 배당·이연법인세·원가배분
 - Phase E 전략론 완성 (2026-04-24): 학습곡선·BCG·포터 공급자·경쟁강도·Ansoff
 - Phase F 운영관리 완성 (2026-04-24): 서비스큐·생산리드타임·EOQ·Bullwhip
-- Phase G 부분 (2026-04-24): CLV·Adstock (STP는 미착수)
-- Phase H 부분 (2026-04-24): 인력 레버·otherExpense 분해 (학습효과는 미착수)
+- Phase G 고급 마케팅 완성 (2026-04-24): CLV·Adstock·STP
+- Phase H 인사·조직경제학 완성 (2026-04-24): 인력 레버·otherExpense 분해·조직 학습효과
 
 ---
 
 ## 이어서 할 일
 
-Phase E 5/5 · Phase F 4/4 · Phase G 2/3 · Phase H 1/3 완료 + UX 개선 4종. 남은 트랙:
+Phase E~H 모두 완료 + UX·해설·배포 기반 작업 7종 완료. 남은 가벼운 후보:
 
-- **Phase G 남은 트랙** — STP 프레임워크 명시 UI (세분화→타겟팅→포지셔닝 뷰)
-- **Phase H 남은 트랙** — 라운드 누적 학습효과 (경력 기반 효율성 소폭 상승) / 인력 이직률 모델 (급여 vs 업계평균에 따른 이탈)
-- **전략 해설 레이어** — 결과 페이지에 교과서 프레임워크 태그 (예: "R3 = Porter 비용우위 진입 시점") 자동 매칭
-- **모바일 레이아웃** — 탭 UI를 단일 컬럼 세로 스택으로 폴백
-- **/lab/queue discrete-event 엔진 통합 (선택)** — results 드릴다운 탭으로 분기 판매의 시간대별 M/M/1 시뮬 보여주기
+- **Phase H 이직률 모델** — 급여 레버 또는 업계평균 비교로 인력 이탈 동학 (현재는 headcount 자유 조정만)
+- **v2.5 git 태그 + 공개 배포** — 현재는 개인 프로젝트. Vercel 배포는 로컬 Ollama 의존 때문에 제한적. Tailscale 또는 LLM provider 어댑터 작업 필요
+- **도움말/튜토리얼 레이어** — 처음 들어온 사용자를 위한 onboarding 툴팁 (현재는 이론 지식 가정)
+- **경쟁사 개별 페르소나화** — 각 경쟁사에 고유 "전략 성향" (텍스트 설명 + AI 해설)
 
 (선택) **Phase D 보강** — `docs/roadmap-archive/phase-d-financial-tax.md`의 "남은 보강 후보". DTA 명시화 / 세법상 이월결손금 정밀화 / 투자세액공제 / 간접법 CF 정식화
 
@@ -59,15 +58,15 @@ Phase E 5/5 · Phase F 4/4 · Phase G 2/3 · Phase H 1/3 완료 + UX 개선 4종
 - Bullwhip 효과 ✅ (`lib/bullwhip.ts`, 플레이어 수요 변동률 > 20% 초과분이 경쟁사 광고 증폭 + SPI extra drift로 전달)
 - (선택) `/lab/queue` discrete-event 엔진을 results 서비스 드릴다운 탭으로 통합 — 미착수
 
-### Phase G — 고급 마케팅 (CLV, Adstock, STP)
-- CLV 대시보드 ✅ 2026-04-24 (`lib/clv.ts`, retention = 0.5×satisfaction + 0.5×brandEquity, CLV = AOV × 1/(1−retention), results 페이지 4-분할 카드 + 전술 코멘트)
-- Adstock 모델 ✅ 2026-04-24 (`lib/adstock.ts`, Koyck geometric lag λ=0.5, effectiveAd = currentAd + λ×prevAdstock, `GameState.adstock` stock 추가)
-- STP 프레임워크 명시 UI (세분화→타겟팅→포지셔닝) — 미착수
+### Phase G — 고급 마케팅 (CLV, Adstock, STP) ✅ 2026-04-24
+- CLV 대시보드 ✅ (`lib/clv.ts`, retention = 0.5×satisfaction + 0.5×brandEquity, CLV = AOV × 1/(1−retention), results 페이지 4-분할 카드 + 전술 코멘트)
+- Adstock 모델 ✅ (`lib/adstock.ts`, Koyck geometric lag λ=0.5, effectiveAd = currentAd + λ×prevAdstock, `GameState.adstock` stock 추가)
+- STP 프레임워크 UI ✅ (`lib/stp.ts`, 페르소나별 세그먼트 매력도·획득률·광고 도달·topChannel 매칭 카드)
 
-### Phase H — 인사·조직경제학
-- 인력 규모 레버 ✅ 2026-04-24 (`lib/labor.ts`, `Decisions.headcount: {sales, rd}`, 영업팀 → 직영채널 배수, R&D팀 → cumulativeImproveRd 실효 배수)
-- `otherExpense` 분해 ✅ 2026-04-24 (G&A 50M + 인건비 + 설비유지 0.5%/분기 + 서비스 opex + 재고유지비 5%/분기, PnL에 5필드로 가시화)
-- 학습효과 (라운드 누적 경험 → 전 부문 효율성 소폭 상승) — 미착수
+### Phase H — 인사·조직경제학 ✅ 2026-04-24
+- 인력 규모 레버 ✅ (`lib/labor.ts`, `Decisions.headcount: {sales, rd}`, 영업팀 → 직영채널 배수, R&D팀 → cumulativeImproveRd 실효 배수)
+- `otherExpense` 분해 ✅ (G&A 50M + 인건비 + 설비유지 0.5%/분기 + 서비스 opex + 재고유지비 5%/분기, PnL에 5필드로 가시화)
+- 조직 학습효과 ✅ (`lib/org-learning.ts`, 라운드당 +1% 전 부문 원가 효율성, 최대 +30% cap)
 
 ### 배포·공개 (장기 후순위)
 - LLM provider 어댑터 (Ollama 외 선택지), Vercel 배포, README + hero GIF, 블로그, v2.0 태그
@@ -83,6 +82,14 @@ Phase E 5/5 · Phase F 4/4 · Phase G 2/3 · Phase H 1/3 완료 + UX 개선 4종
 
 ## 진행 로그
 
+- 2026-04-24 (4) Phase E~H 완결 + 해설·배포 7종 (166/166 테스트):
+  - **4 프레임워크 태그** (`lib/framework-tags.ts`) — Porter/BCG/Ansoff/경험곡선/Bullwhip/Overtrading 등 자동 매칭, results 상단 상위 5개 배지
+  - **1 STP UI** (`lib/stp.ts`) — 페르소나별 매력도·획득률·광고 도달·topChannel 매칭 (일치/다른 채널 과다 경고)
+  - **2 조직 학습** (`lib/org-learning.ts`) — 라운드당 +1% 전 부문 원가 효율성, unit cost 공식에 반영
+  - **3 서비스 큐 드릴다운** (`lib/mm1-metrics.ts`) — M/M/1 표준 지표 (ρ, L, Lq, W, Wq) + 시스템 내 인원 확률분포 bar chart, /lab/queue 링크
+  - **5 의사결정 타임라인** — /play/end에 분기별 결정·stock·성과 heatmap 테이블, 변경된 결정 하이라이트
+  - **6 README** — 경영학 이론 ↔ 게임 레버 대응표 19항목, 구조·커맨드·LLM 요구사항
+  - **7 모바일 레이아웃** — 그리드 반응형 (grid-cols-N → grid-cols-1 sm:grid-cols-N md:grid-cols-N), 탭 바 가로 스크롤, /play padding
 - 2026-04-24 (3) 이론 심화 7종 일괄 구현 (142/142 테스트, store v14):
   - **5 레버 인라인 프리뷰** — 탭별 민감도 분석 카드 (가격 -1만원, 품질 +1, 서비스 +5k 등 시나리오별 매출·점유·만족도 delta 실시간 계산)
   - **1 Adstock carryover** (`lib/adstock.ts`) — Koyck λ=0.5, effectiveAd = current + λ×prevAdstock, 마케팅 탭에 carryover 뱃지
