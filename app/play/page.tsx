@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/stores/game-store';
 import { DecisionSlider } from '@/components/DecisionSlider';
 import { runSimulation } from '@/lib/game-engine';
 import { getMarketSize } from '@/lib/competitor-ai';
+import type { ProductId } from '@/lib/types';
 
 function formatBillion(v: number) {
   return (v / 1_000_000_000).toFixed(1);
@@ -17,17 +18,21 @@ function formatMan(v: number) {
 
 export default function DecisionPage() {
   const router = useRouter();
-  const { decisions, setDecisions, setChannels, currentRound, competitors, qualityCap, resetGame, roundHistory } = useGameStore();
+  const { decisions, setDecisions, setChannels, setProduct, currentRound, competitors, qualityCap, resetGame, roundHistory, currentEvent, brandEquity } = useGameStore();
+  const [activeProduct, setActiveProduct] = useState<ProductId>('A');
   const preview = useMemo(() => {
     const marketSize = getMarketSize(currentRound);
-    return runSimulation(decisions, competitors, marketSize, qualityCap);
-  }, [decisions, currentRound, competitors, qualityCap]);
+    return runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity);
+  }, [decisions, currentRound, competitors, qualityCap, currentEvent, brandEquity]);
 
-  const totalCost =
-    decisions.adBudget +
-    decisions.rdBudget / 4 +
-    decisions.production * (120_000 + (decisions.quality - 1) * 25_000) +
-    100_000_000;
+  const totalAd = decisions.adBudget.search + decisions.adBudget.display + decisions.adBudget.influencer;
+  const totalProductionCost = decisions.products.reduce(
+    (sum, p) => sum + p.production * (120_000 + (p.quality - 1) * 25_000),
+    0,
+  );
+  const totalCost = totalAd + decisions.rdBudget / 4 + totalProductionCost + 100_000_000;
+
+  const product = decisions.products.find((p) => p.id === activeProduct) ?? decisions.products[0];
 
   const handleChannelChange = (key: 'online' | 'mart' | 'direct', value: number) => {
     const others = { ...decisions.channels };
@@ -81,22 +86,91 @@ export default function DecisionPage() {
         )}
       </div>
 
+      {currentEvent.id !== 'calm' && (
+        <div
+          className="border-l-4 rounded-md px-4 py-3 text-sm flex items-start gap-3"
+          style={{
+            background: currentEvent.severity === 'good' ? '#ecfdf5' : '#fef2f2',
+            borderColor: currentEvent.severity === 'good' ? '#10b981' : '#ef4444',
+            color: 'var(--biz-text)',
+          }}
+        >
+          <span className="text-xs font-semibold uppercase tracking-wider mt-0.5" style={{ color: currentEvent.severity === 'good' ? '#047857' : '#b91c1c' }}>
+            {currentEvent.severity === 'good' ? '기회' : '리스크'}
+          </span>
+          <div>
+            <div className="font-semibold">{currentEvent.title}</div>
+            <div className="text-xs mt-0.5" style={{ color: 'var(--biz-text-muted)' }}>{currentEvent.description}</div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--biz-text-muted)' }}>
+        <span>브랜드 에쿼티</span>
+        <div className="flex-1 max-w-xs h-2 rounded-full" style={{ background: '#e2e8f0' }}>
+          <div
+            className="h-2 rounded-full transition-all"
+            style={{ background: 'var(--biz-primary)', width: `${brandEquity}%` }}
+          />
+        </div>
+        <span className="font-mono" style={{ color: 'var(--biz-text)' }}>{brandEquity.toFixed(0)} / 100</span>
+      </div>
+
       <h2 className="text-xs font-[Manrope] font-bold uppercase tracking-wider" style={{ color: 'var(--biz-text-muted)' }}>의사결정 레버</h2>
 
       <div className="grid gap-4 lg:grid-cols-[2fr_3fr]">
         <div className="space-y-4">
+          <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 space-y-3">
+            <div className="flex gap-1 -mt-1 -mx-1">
+              {decisions.products.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setActiveProduct(p.id)}
+                  className="flex-1 text-xs px-3 py-2 rounded-md font-semibold transition-colors"
+                  style={{
+                    background: activeProduct === p.id ? 'var(--biz-primary)' : 'transparent',
+                    color: activeProduct === p.id ? 'white' : 'var(--biz-text-muted)',
+                    borderColor: activeProduct === p.id ? 'var(--biz-primary)' : 'var(--biz-border)',
+                  }}
+                >
+                  {p.id} · {p.name}
+                </button>
+              ))}
+            </div>
+            <DecisionSlider
+              label={`${product.name} · 가격`}
+              value={product.price}
+              min={200_000}
+              max={500_000}
+              step={10_000}
+              unit="/ 대"
+              formatValue={(v) => `₩${formatMan(v)}만`}
+              onChange={(v) => setProduct(product.id, { price: v })}
+            />
+            <DecisionSlider
+              label={`${product.name} · 품질`}
+              value={product.quality}
+              min={1}
+              max={Math.floor(qualityCap)}
+              step={1}
+              unit=""
+              formatValue={(v) => '★'.repeat(v) + '☆'.repeat(5 - v)}
+              onChange={(v) => setProduct(product.id, { quality: v })}
+            />
+            <DecisionSlider
+              label={`${product.name} · 생산`}
+              value={product.production}
+              min={2_000}
+              max={20_000}
+              step={500}
+              unit="대"
+              formatValue={(v) => v.toLocaleString()}
+              onChange={(v) => setProduct(product.id, { production: v })}
+            />
+          </div>
+
           <DecisionSlider
-            label="제품 가격"
-            value={decisions.price}
-            min={200_000}
-            max={500_000}
-            step={10_000}
-            unit="/ 대"
-            formatValue={(v) => `₩${formatMan(v)}만`}
-            onChange={(v) => setDecisions({ price: v })}
-          />
-          <DecisionSlider
-            label="R&D 투자"
+            label="R&D 투자 (공유)"
             value={decisions.rdBudget}
             min={0}
             max={5_000_000_000}
@@ -105,39 +179,40 @@ export default function DecisionPage() {
             formatValue={(v) => `₩${formatBillion(v)}B`}
             onChange={(v) => setDecisions({ rdBudget: v })}
           />
-          <DecisionSlider
-            label="광고 예산"
-            value={decisions.adBudget}
-            min={0}
-            max={2_000_000_000}
-            step={50_000_000}
-            unit="/ 분기"
-            formatValue={(v) => `₩${formatBillion(v)}B`}
-            onChange={(v) => setDecisions({ adBudget: v })}
-          />
-          <DecisionSlider
-            label="생산 수량"
-            value={decisions.production}
-            min={5_000}
-            max={30_000}
-            step={1_000}
-            unit="대"
-            formatValue={(v) => v.toLocaleString()}
-            onChange={(v) => setDecisions({ production: v })}
-          />
-          <DecisionSlider
-            label="품질 목표"
-            value={decisions.quality}
-            min={1}
-            max={Math.floor(qualityCap)}
-            step={1}
-            unit=""
-            formatValue={(v) => '★'.repeat(v) + '☆'.repeat(5 - v)}
-            onChange={(v) => setDecisions({ quality: v })}
-          />
-
+          <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs" style={{ color: 'var(--biz-text-muted)' }}>마케팅 믹스 (분기)</div>
+              <div className="text-xs font-mono" style={{ color: 'var(--biz-text)' }}>합계 ₩{formatBillion(totalAd)}B</div>
+            </div>
+            {(
+              [
+                { key: 'search' as const, label: '검색 광고', hint: '박민수(얼리어답터) 반응 큼' },
+                { key: 'display' as const, label: '디스플레이', hint: '이순자(주부) 반응 큼' },
+                { key: 'influencer' as const, label: '인플루언서', hint: '김지현(맞벌이) 반응 큼' },
+              ]
+            ).map(({ key, label, hint }) => (
+              <div key={key}>
+                <div className="mb-1 flex items-center justify-between text-xs">
+                  <span style={{ color: 'var(--biz-text-muted)' }}>
+                    {label}
+                    <span className="ml-2 text-[10px]" style={{ color: 'var(--biz-text-muted)', opacity: 0.75 }}>{hint}</span>
+                  </span>
+                  <span className="font-mono" style={{ color: 'var(--biz-text)' }}>₩{formatBillion(decisions.adBudget[key])}B</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1_000_000_000}
+                  step={25_000_000}
+                  value={decisions.adBudget[key]}
+                  onChange={(e) => setDecisions({ adBudget: { ...decisions.adBudget, [key]: Number(e.target.value) } })}
+                  className="w-full accent-gray-900"
+                />
+              </div>
+            ))}
+          </div>
           <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4">
-            <div className="text-xs mb-3" style={{ color: 'var(--biz-text-muted)' }}>유통 채널 배분</div>
+            <div className="text-xs mb-3" style={{ color: 'var(--biz-text-muted)' }}>유통 채널 배분 (공유)</div>
             {(['online', 'mart', 'direct'] as const).map((key) => (
               <div key={key} className="mb-2">
                 <div className="mb-1 flex items-center justify-between text-xs">
@@ -156,6 +231,43 @@ export default function DecisionPage() {
                 />
               </div>
             ))}
+          </div>
+
+          <div style={{ background: 'var(--biz-card)', borderColor: 'var(--biz-border)' }} className="border rounded-lg p-4 space-y-3">
+            <div className="text-xs" style={{ color: 'var(--biz-text-muted)' }}>
+              재무 조달 (선택)
+              <span className="ml-2 text-[10px] opacity-75">부채는 이자비용 증가, 증자는 브랜드 희석 페널티</span>
+            </div>
+            <div>
+              <div className="mb-1 flex items-center justify-between text-xs">
+                <span style={{ color: 'var(--biz-text-muted)' }}>신규 차입금</span>
+                <span className="font-mono" style={{ color: 'var(--biz-text)' }}>₩{formatBillion(decisions.financing.newDebt)}B</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={5_000_000_000}
+                step={100_000_000}
+                value={decisions.financing.newDebt}
+                onChange={(e) => setDecisions({ financing: { ...decisions.financing, newDebt: Number(e.target.value) } })}
+                className="w-full accent-gray-900"
+              />
+            </div>
+            <div>
+              <div className="mb-1 flex items-center justify-between text-xs">
+                <span style={{ color: 'var(--biz-text-muted)' }}>유상증자</span>
+                <span className="font-mono" style={{ color: 'var(--biz-text)' }}>₩{formatBillion(decisions.financing.newEquity)}B</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={5_000_000_000}
+                step={100_000_000}
+                value={decisions.financing.newEquity}
+                onChange={(e) => setDecisions({ financing: { ...decisions.financing, newEquity: Number(e.target.value) } })}
+                className="w-full accent-gray-900"
+              />
+            </div>
           </div>
 
           <div style={{ background: 'var(--biz-primary-light)', borderColor: 'var(--biz-border)', color: 'var(--biz-text-muted)' }} className="border rounded-lg px-4 py-3 text-sm">

@@ -10,7 +10,7 @@ type Tab = 'pnl' | 'bs' | 'cf';
 
 export default function FinancialsPage() {
   const router = useRouter();
-  const { financials, results, decisions, currentRound, maxRounds, advanceRound, gameOver, roundHistory, roundDebriefs, setRoundDebrief } = useGameStore();
+  const { financials, results, decisions, currentRound, maxRounds, advanceRound, gameOver, roundHistory, roundDebriefs, setRoundDebrief, currentEvent, brandEquity } = useGameStore();
   const [tab, setTab] = useState<Tab>('pnl');
 
   const previousResults = useMemo(() => {
@@ -21,9 +21,9 @@ export default function FinancialsPage() {
   const debriefPayload = useMemo(
     () =>
       results
-        ? { mode: 'round' as const, round: currentRound, decisions, results, previousResults }
+        ? { mode: 'round' as const, round: currentRound, decisions, results, previousResults, event: currentEvent, brandEquity }
         : null,
-    [results, currentRound, decisions, previousResults],
+    [results, currentRound, decisions, previousResults, currentEvent, brandEquity],
   );
 
   useEffect(() => {

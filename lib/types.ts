@@ -1,5 +1,11 @@
 export type PersonaId = 'jiyeon' | 'minsoo' | 'soonja';
 
+export type AdChannel = 'search' | 'display' | 'influencer';
+
+export type AdMix = { search: number; display: number; influencer: number };
+
+export type AdResponse = { search: number; display: number; influencer: number };
+
 export type PersonaAttributes = {
   id: PersonaId;
   name: string;
@@ -11,16 +17,28 @@ export type PersonaAttributes = {
   channelPreference: { online: number; mart: number; direct: number };
   segmentShare: number;
   adSaturation: number;
+  adResponse: AdResponse;
   emoji: string;
 };
 
-export type Decisions = {
+export type Financing = { newDebt: number; newEquity: number };
+
+export type ProductId = 'A' | 'B';
+
+export type ProductDecision = {
+  id: ProductId;
+  name: string;
   price: number;
-  rdBudget: number;
-  adBudget: number;
-  production: number;
-  channels: { online: number; mart: number; direct: number };
   quality: number;
+  production: number;
+};
+
+export type Decisions = {
+  products: [ProductDecision, ProductDecision];
+  rdBudget: number;
+  adBudget: AdMix;
+  channels: { online: number; mart: number; direct: number };
+  financing: Financing;
 };
 
 export type ChatMessage = {
@@ -39,6 +57,26 @@ export type CompetitorState = {
   unitsSold: number;
 };
 
+export type EventSeverity = 'good' | 'bad' | 'neutral';
+
+export type EventEffects = {
+  costMultiplier?: number;
+  marketSizeMultiplier?: number;
+  qualityCapBonus?: number;
+  competitorQualityBoost?: number;
+  martChannelPenalty?: number;
+  satisfactionPenalty?: number;
+  brandEquityPenalty?: number;
+};
+
+export type RoundEvent = {
+  id: string;
+  title: string;
+  description: string;
+  severity: EventSeverity;
+  effects: EventEffects;
+};
+
 export type RoundSnapshot = {
   round: number;
   decisions: Decisions;
@@ -48,6 +86,8 @@ export type RoundSnapshot = {
   marketSize: number;
   cumulativeRd: number;
   qualityCap: number;
+  event: RoundEvent;
+  brandEquity: number;
 };
 
 export type CarryForwardBS = {
@@ -55,6 +95,14 @@ export type CarryForwardBS = {
   debt: number;
   equity: number;
   retainedEarnings: number;
+};
+
+export type ProductResult = {
+  id: ProductId;
+  name: string;
+  unitsSold: number;
+  revenue: number;
+  segmentDemand: Record<PersonaId, number>;
 };
 
 export type SimulationResults = {
@@ -66,6 +114,7 @@ export type SimulationResults = {
   segmentDemand: Record<PersonaId, number>;
   marketSize: number;
   competitors: CompetitorState[];
+  perProduct: Record<ProductId, ProductResult>;
 };
 
 export type PnL = {
@@ -122,4 +171,6 @@ export type GameState = {
   gameOver: boolean;
   roundDebriefs: Record<number, string>;
   finalDebrief: string | null;
+  currentEvent: RoundEvent;
+  brandEquity: number;
 };

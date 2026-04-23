@@ -12,6 +12,7 @@ export const PERSONAS: PersonaAttributes[] = [
     channelPreference: { online: 0.7, mart: 0.2, direct: 0.1 },
     segmentShare: 0.4,
     adSaturation: 800_000_000,
+    adResponse: { search: 0.35, display: 0.25, influencer: 0.4 },
     emoji: '👩',
   },
   {
@@ -25,6 +26,7 @@ export const PERSONAS: PersonaAttributes[] = [
     channelPreference: { online: 0.5, mart: 0.1, direct: 0.4 },
     segmentShare: 0.25,
     adSaturation: 1_200_000_000,
+    adResponse: { search: 0.55, display: 0.2, influencer: 0.25 },
     emoji: '👨',
   },
   {
@@ -38,6 +40,7 @@ export const PERSONAS: PersonaAttributes[] = [
     channelPreference: { online: 0.15, mart: 0.7, direct: 0.15 },
     segmentShare: 0.35,
     adSaturation: 600_000_000,
+    adResponse: { search: 0.15, display: 0.7, influencer: 0.15 },
     emoji: '👵',
   },
 ];
@@ -47,8 +50,18 @@ export function getPersona(id: PersonaId): PersonaAttributes {
 }
 
 export function buildSystemPrompt(persona: PersonaAttributes, decisions: Decisions): string {
-  const priceStr = (decisions.price / 10000).toFixed(1);
-  const qualityStars = '★'.repeat(decisions.quality) + '☆'.repeat(5 - decisions.quality);
+  const productLines = decisions.products.map((p) => {
+    const priceStr = (p.price / 10000).toFixed(1);
+    const qualityStars = '★'.repeat(p.quality) + '☆'.repeat(5 - p.quality);
+    return `- ${p.name}: ${priceStr}만원, 품질 ${qualityStars}`;
+  }).join('\n');
+  const totalAd = decisions.adBudget.search + decisions.adBudget.display + decisions.adBudget.influencer;
+  const mix = decisions.adBudget;
+  const dominantChannel = mix.search >= mix.display && mix.search >= mix.influencer
+    ? '검색광고'
+    : mix.display >= mix.influencer
+      ? '디스플레이·배너광고'
+      : '인플루언서·SNS 콘텐츠';
 
   return `당신은 한국 스마트홈 가전 시장의 소비자 "${persona.name}"입니다.
 
@@ -61,9 +74,9 @@ export function buildSystemPrompt(persona: PersonaAttributes, decisions: Decisio
 - 선호 쇼핑 채널: ${persona.channelPreference.online > 0.5 ? '온라인' : persona.channelPreference.mart > 0.5 ? '대형마트' : '직영매장'}
 
 ## 현재 시장 상황
-- 시장에 출시된 제품 가격: ${priceStr}만원
-- 제품 품질: ${qualityStars}
-- 광고를 ${decisions.adBudget > 1_000_000_000 ? '많이' : decisions.adBudget > 500_000_000 ? '적당히' : '거의'} 보았음
+- 이 브랜드는 두 개의 제품 라인을 운영 중:
+${productLines}
+- 광고를 ${totalAd > 1_000_000_000 ? '많이' : totalAd > 500_000_000 ? '적당히' : '거의'} 보았음. 특히 ${dominantChannel}에서 자주 눈에 띔
 - R&D 투자 수준: ${decisions.rdBudget > 3_000_000_000 ? '매우 높음' : decisions.rdBudget > 1_500_000_000 ? '보통' : '낮음'}
 
 ## 대화 규칙

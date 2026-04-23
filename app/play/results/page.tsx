@@ -17,7 +17,7 @@ function formatKRW(value: number): string {
 
 export default function ResultsPage() {
   const router = useRouter();
-  const { results, decisions, currentRound, roundHistory, roundDebriefs, setRoundDebrief } = useGameStore();
+  const { results, decisions, currentRound, roundHistory, roundDebriefs, setRoundDebrief, currentEvent, brandEquity } = useGameStore();
   const [competitorTab, setCompetitorTab] = useState<'market' | 'ads' | 'channels'>('market');
 
   const previousResults = useMemo(() => {
@@ -28,9 +28,9 @@ export default function ResultsPage() {
   const debriefPayload = useMemo(
     () =>
       results
-        ? { mode: 'round' as const, round: currentRound, decisions, results, previousResults }
+        ? { mode: 'round' as const, round: currentRound, decisions, results, previousResults, event: currentEvent, brandEquity }
         : null,
-    [results, currentRound, decisions, previousResults],
+    [results, currentRound, decisions, previousResults, currentEvent, brandEquity],
   );
 
   useEffect(() => {
@@ -146,15 +146,15 @@ export default function ResultsPage() {
             <ReferenceLine x={0} stroke="var(--biz-border)" strokeDasharray="5 5" />
             <ReferenceLine y={0} stroke="var(--biz-border)" strokeDasharray="5 5" />
 
-            {/* 우리 회사 */}
+            {/* 우리 회사 제품 A/B */}
             <Scatter
               name="우리회사"
-              data={[{
-                x: 15 - ((decisions.price - 200_000) / 300_000) * 30,
-                y: (decisions.quality - 3) * 4,
+              data={decisions.products.map((p) => ({
+                x: 15 - ((p.price - 200_000) / 300_000) * 30,
+                y: (p.quality - 3) * 4,
                 z: 200,
-                name: '우리회사'
-              }]}
+                name: `${p.id}·${p.name}`,
+              }))}
               fill="#0066cc"
             />
 
@@ -225,9 +225,9 @@ export default function ResultsPage() {
                 )}
                 {competitorTab === 'ads' && (
                   <>
-                    <th className="text-right px-3 py-2 text-white font-semibold">온라인</th>
-                    <th className="text-right px-3 py-2 text-white font-semibold">마트</th>
-                    <th className="text-right px-3 py-2 text-white font-semibold">직영</th>
+                    <th className="text-right px-3 py-2 text-white font-semibold">검색</th>
+                    <th className="text-right px-3 py-2 text-white font-semibold">디스플레이</th>
+                    <th className="text-right px-3 py-2 text-white font-semibold">인플루언서</th>
                     <th className="text-right px-3 py-2 text-white font-semibold">합계</th>
                   </>
                 )}
@@ -253,10 +253,10 @@ export default function ResultsPage() {
                 )}
                 {competitorTab === 'ads' && (
                   <>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(decisions.adBudget * 0.4 / 1_000_000).toFixed(0)}M</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(decisions.adBudget * 0.35 / 1_000_000).toFixed(0)}M</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(decisions.adBudget * 0.25 / 1_000_000).toFixed(0)}M</td>
-                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(decisions.adBudget / 1_000_000).toFixed(0)}M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(decisions.adBudget.search / 1_000_000).toFixed(0)}M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(decisions.adBudget.display / 1_000_000).toFixed(0)}M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(decisions.adBudget.influencer / 1_000_000).toFixed(0)}M</td>
+                    <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{((decisions.adBudget.search + decisions.adBudget.display + decisions.adBudget.influencer) / 1_000_000).toFixed(0)}M</td>
                   </>
                 )}
                 {competitorTab === 'channels' && (
@@ -281,9 +281,9 @@ export default function ResultsPage() {
                   )}
                   {competitorTab === 'ads' && (
                     <>
-                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(c.adBudget * 0.4 / 1_000_000).toFixed(0)}M</td>
-                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(c.adBudget * 0.35 / 1_000_000).toFixed(0)}M</td>
-                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(c.adBudget * 0.25 / 1_000_000).toFixed(0)}M</td>
+                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(c.adBudget / 3 / 1_000_000).toFixed(0)}M</td>
+                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(c.adBudget / 3 / 1_000_000).toFixed(0)}M</td>
+                      <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(c.adBudget / 3 / 1_000_000).toFixed(0)}M</td>
                       <td className="text-right px-3 py-2" style={{ color: 'var(--biz-text)' }}>{(c.adBudget / 1_000_000).toFixed(0)}M</td>
                     </>
                   )}

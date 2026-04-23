@@ -1,4 +1,4 @@
-import type { Decisions, SimulationResults, RoundSnapshot } from '@/lib/types';
+import type { Decisions, SimulationResults, RoundSnapshot, RoundEvent } from '@/lib/types';
 import { SERVER_ERROR_MESSAGE } from '@/lib/errors';
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
@@ -10,6 +10,8 @@ type RoundBody = {
   decisions: Decisions;
   results: SimulationResults;
   previousResults?: SimulationResults | null;
+  event?: RoundEvent | null;
+  brandEquity?: number;
 };
 
 type FinalBody = {
@@ -27,7 +29,7 @@ function fmtKRW(v: number): string {
 }
 
 function buildRoundPrompt(body: RoundBody): string {
-  const { round, decisions, results, previousResults } = body;
+  const { round, decisions, results, previousResults, event, brandEquity } = body;
   const competitorAvgPrice = Math.round(
     results.competitors.reduce((s, c) => s + c.price, 0) / Math.max(1, results.competitors.length),
   );
@@ -40,35 +42,58 @@ function buildRoundPrompt(body: RoundBody): string {
     ? `이전 분기 대비: 점유율 ${(results.marketShare - previousResults.marketShare).toFixed(1)}%p, 영업이익 ${fmtKRW(results.operatingProfit - previousResults.operatingProfit)}`
     : '첫 분기';
 
+  const totalProduction = decisions.products.reduce((s, p) => s + p.production, 0);
+  const avgPrice = decisions.products.reduce((s, p) => s + p.price, 0) / decisions.products.length;
+  const avgQuality = decisions.products.reduce((s, p) => s + p.quality, 0) / decisions.products.length;
+
   const tags: string[] = [];
   if (results.operatingProfit < 0) tags.push('영업적자');
   else if (results.operatingProfit > results.revenue * 0.1) tags.push('영업흑자 양호');
-  if (decisions.production > results.unitsSold * 1.1) tags.push('재고과잉');
-  if (decisions.production < results.unitsSold * 0.95) tags.push('품절/수요초과');
-  if (decisions.price > competitorAvgPrice * 1.05) tags.push('가격 프리미엄');
-  else if (decisions.price < competitorAvgPrice * 0.95) tags.push('저가전략');
+  if (totalProduction > results.unitsSold * 1.1) tags.push('재고과잉');
+  if (totalProduction < results.unitsSold * 0.95) tags.push('품절/수요초과');
+  if (avgPrice > competitorAvgPrice * 1.05) tags.push('가격 프리미엄');
+  else if (avgPrice < competitorAvgPrice * 0.95) tags.push('저가전략');
   if (previousResults) {
     const shareDelta = results.marketShare - previousResults.marketShare;
     if (shareDelta > 1) tags.push('점유율상승');
     else if (shareDelta < -1) tags.push('점유율하락');
   }
+  for (const p of decisions.products) {
+    const pr = results.perProduct[p.id];
+    if (pr && pr.unitsSold === 0 && p.production > 0) tags.push(`${p.name} 전혀 안 팔림`);
+  }
 
-  return [
+  const eventLine = event && event.id !== 'calm'
+    ? `[이번 분기 이벤트] ${event.title} (${event.severity === 'good' ? '기회' : '리스크'}) — ${event.description}`
+    : '[이번 분기 이벤트] 특이사항 없음';
+  const brandLine = typeof brandEquity === 'number'
+    ? `[브랜드 에쿼티] ${brandEquity.toFixed(0)} / 100 (100에 가까울수록 가격 저항 완화)`
+    : null;
+
+  const lines: (string | null)[] = [
     `BizSim 경영 시뮬레이션 ${round}분기 결과를 플레이어에게 2-3문장으로 해설해줘.`,
     ``,
     `[판단 원칙]`,
     `- 영업적자 상태면 광고·R&D 증액은 제안 금지. 가격·비용·생산량 조정을 우선 검토.`,
     `- 재고과잉이면 다음 분기 생산 축소 또는 할인 프로모션 제안.`,
     `- 품절/수요초과면 생산 증대 또는 가격 인상 제안.`,
+    `- 이벤트가 있으면 해당 이벤트가 성과에 어떻게 작용했는지 한 번 언급.`,
     `- 제안은 정확히 하나만 (여러 개 나열 금지).`,
     `- 구체적인 숫자(%, 금액, 또는 증감폭) 최소 1개를 본문에 인용.`,
     `- 해설만 한국어로 출력, 서론이나 마무리 인사 없이.`,
     ``,
     `[상황 태그] ${tags.length > 0 ? tags.join(' · ') : '특이사항 없음'}`,
+    eventLine,
+    brandLine,
     ``,
     `[우리회사 의사결정]`,
-    `가격 ${fmtKRW(decisions.price)}, 품질 ${decisions.quality}/5, R&D ${fmtKRW(decisions.rdBudget)}, 광고 ${fmtKRW(decisions.adBudget)}, 생산 ${decisions.production.toLocaleString()}대`,
+    ...decisions.products.map((p) => {
+      const pr = results.perProduct[p.id];
+      return `- ${p.name} (${p.id}): 가격 ${fmtKRW(p.price)} 품질 ${p.quality}/5 생산 ${p.production.toLocaleString()}대 → 판매 ${pr ? pr.unitsSold.toLocaleString() : 0}대 / 매출 ${fmtKRW(pr?.revenue ?? 0)}`;
+    }),
+    `공유: R&D ${fmtKRW(decisions.rdBudget)}, 광고 합계 ${fmtKRW(decisions.adBudget.search + decisions.adBudget.display + decisions.adBudget.influencer)} (검색 ${fmtKRW(decisions.adBudget.search)}/디스플레이 ${fmtKRW(decisions.adBudget.display)}/인플루언서 ${fmtKRW(decisions.adBudget.influencer)})`,
     `채널 온라인 ${decisions.channels.online}% / 마트 ${decisions.channels.mart}% / 직영 ${decisions.channels.direct}%`,
+    `평균가 ${fmtKRW(avgPrice)} · 평균 품질 ${avgQuality.toFixed(1)}/5`,
     ``,
     `[성과]`,
     `판매 ${results.unitsSold.toLocaleString()}대 / 매출 ${fmtKRW(results.revenue)} / 영업이익 ${fmtKRW(results.operatingProfit)}`,
@@ -77,7 +102,8 @@ function buildRoundPrompt(body: RoundBody): string {
     ``,
     `[경쟁 구도]`,
     `경쟁사 평균가 ${fmtKRW(competitorAvgPrice)}, 점유율 1위: ${leader.name} (${leader.share}%)`,
-  ].join('\n');
+  ];
+  return lines.filter((l): l is string => l !== null).join('\n');
 }
 
 function buildFinalPrompt(body: FinalBody): string {
@@ -86,8 +112,10 @@ function buildFinalPrompt(body: FinalBody): string {
   const totalProfit = history.reduce((s, r) => s + r.results.operatingProfit, 0);
   const avgShare = history.reduce((s, r) => s + r.results.marketShare, 0) / Math.max(1, history.length);
   const lines = history.map(
-    (r) =>
-      `R${r.round}: 점유 ${r.results.marketShare}%, 매출 ${fmtKRW(r.results.revenue)}, 영업이익 ${fmtKRW(r.results.operatingProfit)}`,
+    (r) => {
+      const eventTag = r.event && r.event.id !== 'calm' ? ` [${r.event.title}]` : '';
+      return `R${r.round}: 점유 ${r.results.marketShare}%, 매출 ${fmtKRW(r.results.revenue)}, 영업이익 ${fmtKRW(r.results.operatingProfit)}${eventTag}`;
+    },
   );
 
   const profitableRounds = history.filter((r) => r.results.operatingProfit > 0).length;

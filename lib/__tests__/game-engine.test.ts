@@ -1,16 +1,23 @@
 import { describe, it, expect } from 'vitest';
 import { runSimulation } from '../game-engine';
 import { INITIAL_COMPETITORS, getMarketSize } from '../competitor-ai';
-import type { Decisions } from '../types';
+import { CALM_EVENT, EVENT_POOL } from '../events';
+import type { Decisions, ProductDecision } from '../types';
+
+const PRODUCT_A: ProductDecision = { id: 'A', name: '프리미엄', price: 429_000, quality: 4, production: 8_000 };
+const PRODUCT_B: ProductDecision = { id: 'B', name: '밸류', price: 279_000, quality: 3, production: 7_000 };
 
 const DEFAULT_DECISIONS: Decisions = {
-  price: 349_000,
+  products: [PRODUCT_A, PRODUCT_B],
   rdBudget: 2_100_000_000,
-  adBudget: 800_000_000,
-  production: 15_000,
+  adBudget: { search: 300_000_000, display: 250_000_000, influencer: 250_000_000 },
   channels: { online: 60, mart: 30, direct: 10 },
-  quality: 4,
+  financing: { newDebt: 0, newEquity: 0 },
 };
+
+function withProducts(base: Decisions, products: [ProductDecision, ProductDecision]): Decisions {
+  return { ...base, products };
+}
 
 describe('runSimulation', () => {
   const marketSize = getMarketSize(1);
@@ -28,40 +35,64 @@ describe('runSimulation', () => {
     expect(result.unitsSold).toBeGreaterThan(0);
   });
 
-  it('sells no more than production quantity', () => {
-    const decisions = { ...DEFAULT_DECISIONS, production: 100 };
-    const result = runSimulation(decisions, INITIAL_COMPETITORS, marketSize, qualityCap);
-    expect(result.unitsSold).toBeLessThanOrEqual(100);
+  it('sells no more than total production across products', () => {
+    const tightProduction = withProducts(DEFAULT_DECISIONS, [
+      { ...PRODUCT_A, production: 100 },
+      { ...PRODUCT_B, production: 100 },
+    ]);
+    const result = runSimulation(tightProduction, INITIAL_COMPETITORS, marketSize, qualityCap);
+    expect(result.unitsSold).toBeLessThanOrEqual(200);
   });
 
   it('lower price increases demand', () => {
-    const expensive = runSimulation({ ...DEFAULT_DECISIONS, price: 500_000 }, INITIAL_COMPETITORS, marketSize, qualityCap);
-    const cheap = runSimulation({ ...DEFAULT_DECISIONS, price: 200_000 }, INITIAL_COMPETITORS, marketSize, qualityCap);
+    const expensiveProducts: [ProductDecision, ProductDecision] = [
+      { ...PRODUCT_A, price: 500_000 },
+      { ...PRODUCT_B, price: 500_000 },
+    ];
+    const cheapProducts: [ProductDecision, ProductDecision] = [
+      { ...PRODUCT_A, price: 200_000 },
+      { ...PRODUCT_B, price: 200_000 },
+    ];
+    const expensive = runSimulation(withProducts(DEFAULT_DECISIONS, expensiveProducts), INITIAL_COMPETITORS, marketSize, qualityCap);
+    const cheap = runSimulation(withProducts(DEFAULT_DECISIONS, cheapProducts), INITIAL_COMPETITORS, marketSize, qualityCap);
     const expTotal = Object.values(expensive.segmentDemand).reduce((s, d) => s + d, 0);
     const cheapTotal = Object.values(cheap.segmentDemand).reduce((s, d) => s + d, 0);
     expect(cheapTotal).toBeGreaterThan(expTotal);
   });
 
   it('higher quality increases satisfaction', () => {
-    const low = runSimulation({ ...DEFAULT_DECISIONS, quality: 1 }, INITIAL_COMPETITORS, marketSize, qualityCap);
-    const high = runSimulation({ ...DEFAULT_DECISIONS, quality: 3 }, INITIAL_COMPETITORS, marketSize, qualityCap);
+    const lowQ: [ProductDecision, ProductDecision] = [
+      { ...PRODUCT_A, quality: 1 },
+      { ...PRODUCT_B, quality: 1 },
+    ];
+    const highQ: [ProductDecision, ProductDecision] = [
+      { ...PRODUCT_A, quality: 3 },
+      { ...PRODUCT_B, quality: 3 },
+    ];
+    const low = runSimulation(withProducts(DEFAULT_DECISIONS, lowQ), INITIAL_COMPETITORS, marketSize, qualityCap);
+    const high = runSimulation(withProducts(DEFAULT_DECISIONS, highQ), INITIAL_COMPETITORS, marketSize, qualityCap);
     expect(high.satisfaction).toBeGreaterThan(low.satisfaction);
   });
 
   it('zero ad budget still produces some demand', () => {
-    const result = runSimulation({ ...DEFAULT_DECISIONS, adBudget: 0 }, INITIAL_COMPETITORS, marketSize, qualityCap);
+    const result = runSimulation(
+      { ...DEFAULT_DECISIONS, adBudget: { search: 0, display: 0, influencer: 0 } },
+      INITIAL_COMPETITORS, marketSize, qualityCap,
+    );
     const totalDemand = Object.values(result.segmentDemand).reduce((s, d) => s + d, 0);
     expect(totalDemand).toBeGreaterThan(0);
   });
 
   it('all segment demands are non-negative', () => {
     const extreme: Decisions = {
-      price: 500_000,
+      products: [
+        { ...PRODUCT_A, price: 500_000, quality: 1, production: 30_000 },
+        { ...PRODUCT_B, price: 500_000, quality: 1, production: 30_000 },
+      ],
       rdBudget: 0,
-      adBudget: 0,
-      production: 30_000,
+      adBudget: { search: 0, display: 0, influencer: 0 },
       channels: { online: 100, mart: 0, direct: 0 },
-      quality: 1,
+      financing: { newDebt: 0, newEquity: 0 },
     };
     const result = runSimulation(extreme, INITIAL_COMPETITORS, marketSize, qualityCap);
     for (const demand of Object.values(result.segmentDemand)) {
@@ -69,9 +100,57 @@ describe('runSimulation', () => {
     }
   });
 
+  it('ad mix biased toward a persona increases their demand', () => {
+    const displayHeavy: Decisions = { ...DEFAULT_DECISIONS, adBudget: { search: 100_000_000, display: 700_000_000, influencer: 0 } };
+    const searchHeavy: Decisions = { ...DEFAULT_DECISIONS, adBudget: { search: 700_000_000, display: 100_000_000, influencer: 0 } };
+    const d = runSimulation(displayHeavy, INITIAL_COMPETITORS, marketSize, qualityCap);
+    const s = runSimulation(searchHeavy, INITIAL_COMPETITORS, marketSize, qualityCap);
+    expect(d.segmentDemand.soonja).toBeGreaterThan(s.segmentDemand.soonja);
+    expect(s.segmentDemand.minsoo).toBeGreaterThan(d.segmentDemand.minsoo);
+  });
+
   it('includes competitors in results', () => {
     const result = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap);
     expect(result.competitors).toBeDefined();
     expect(result.competitors.length).toBe(3);
+  });
+
+  it('market_boom event expands effective market size', () => {
+    const boom = EVENT_POOL.find((e) => e.id === 'market_boom')!;
+    const base = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap, CALM_EVENT);
+    const boosted = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap, boom);
+    expect(boosted.marketSize).toBeGreaterThan(base.marketSize);
+    expect(boosted.unitsSold).toBeGreaterThanOrEqual(base.unitsSold);
+  });
+
+  it('pr_crisis event reduces satisfaction', () => {
+    const crisis = EVENT_POOL.find((e) => e.id === 'pr_crisis')!;
+    const calm = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap, CALM_EVENT);
+    const hit = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap, crisis);
+    expect(hit.satisfaction).toBeLessThan(calm.satisfaction);
+  });
+
+  it('higher brand equity increases player share at premium price', () => {
+    // 수요가 segmentShare 상한에 걸리지 않도록 극단적 프리미엄 가격 + 낮은 생산
+    const premiumProducts: [ProductDecision, ProductDecision] = [
+      { ...PRODUCT_A, price: 500_000, production: 4_000 },
+      { ...PRODUCT_B, price: 500_000, production: 4_000 },
+    ];
+    const premium = withProducts(DEFAULT_DECISIONS, premiumProducts);
+    const weak = runSimulation(premium, INITIAL_COMPETITORS, marketSize, qualityCap, CALM_EVENT, 10);
+    const strong = runSimulation(premium, INITIAL_COMPETITORS, marketSize, qualityCap, CALM_EVENT, 90);
+    // 상한에 걸려서 unitsSold가 같더라도 raw 세그먼트 수요는 늘어야 함
+    const weakDemand = Object.values(weak.segmentDemand).reduce((s, d) => s + d, 0);
+    const strongDemand = Object.values(strong.segmentDemand).reduce((s, d) => s + d, 0);
+    expect(strongDemand).toBeGreaterThanOrEqual(weakDemand);
+    expect(strong.marketShare).toBeGreaterThanOrEqual(weak.marketShare);
+  });
+
+  it('two products produce separate perProduct results', () => {
+    const result = runSimulation(DEFAULT_DECISIONS, INITIAL_COMPETITORS, marketSize, qualityCap);
+    expect(result.perProduct.A).toBeDefined();
+    expect(result.perProduct.B).toBeDefined();
+    expect(result.perProduct.A.unitsSold + result.perProduct.B.unitsSold).toBe(result.unitsSold);
+    expect(result.perProduct.A.revenue + result.perProduct.B.revenue).toBe(result.revenue);
   });
 });

@@ -2,21 +2,25 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { GameState, Decisions, SimulationResults, FinancialStatements, PersonaId, ChatMessage, CompetitorState, RoundSnapshot, CarryForwardBS } from '@/lib/types';
+import type { GameState, Decisions, SimulationResults, FinancialStatements, PersonaId, ChatMessage, CompetitorState, RoundSnapshot, CarryForwardBS, ProductId, ProductDecision } from '@/lib/types';
 import { INITIAL_COMPETITORS, updateCompetitorDecisions, qualityCapFromRd } from '@/lib/competitor-ai';
+import { CALM_EVENT, rollEvent } from '@/lib/events';
 
 const DEFAULT_DECISIONS: Decisions = {
-  price: 349_000,
+  products: [
+    { id: 'A', name: '프리미엄 라인', price: 429_000, quality: 4, production: 8_000 },
+    { id: 'B', name: '밸류 라인', price: 279_000, quality: 3, production: 7_000 },
+  ],
   rdBudget: 2_100_000_000,
-  adBudget: 800_000_000,
-  production: 15_000,
+  adBudget: { search: 300_000_000, display: 250_000_000, influencer: 250_000_000 },
   channels: { online: 60, mart: 30, direct: 10 },
-  quality: 4,
+  financing: { newDebt: 0, newEquity: 0 },
 };
 
 type GameActions = {
   setDecisions: (decisions: Partial<Decisions>) => void;
   setChannels: (channels: Decisions['channels']) => void;
+  setProduct: (id: ProductId, partial: Partial<ProductDecision>) => void;
   setResults: (results: SimulationResults) => void;
   setFinancials: (financials: FinancialStatements) => void;
   setStep: (step: GameState['step']) => void;
@@ -46,6 +50,8 @@ const initialState: GameState = {
   gameOver: false,
   roundDebriefs: {},
   finalDebrief: null,
+  currentEvent: CALM_EVENT,
+  brandEquity: 30,
 };
 
 export const useGameStore = create<GameState & GameActions>()(
@@ -58,6 +64,12 @@ export const useGameStore = create<GameState & GameActions>()(
 
       setChannels: (channels) =>
         set((s) => ({ decisions: { ...s.decisions, channels } })),
+
+      setProduct: (id, partial) =>
+        set((s) => {
+          const products = s.decisions.products.map((p) => (p.id === id ? { ...p, ...partial } : p)) as Decisions['products'];
+          return { decisions: { ...s.decisions, products } };
+        }),
 
       setResults: (results) => set({ results }),
       setFinancials: (financials) => set({ financials }),
@@ -99,6 +111,8 @@ export const useGameStore = create<GameState & GameActions>()(
       marketSize: s.results.marketSize,
       cumulativeRd: s.cumulativeRd,
       qualityCap: s.qualityCap,
+      event: s.currentEvent,
+      brandEquity: s.brandEquity,
     };
 
     const newCumulativeRd = s.cumulativeRd + s.decisions.rdBudget;
@@ -117,6 +131,16 @@ export const useGameStore = create<GameState & GameActions>()(
       s.results.marketShare,
     );
 
+    // 브랜드 에쿼티: 감가(10%) + 광고비 기반 증가 - 이벤트/증자 페널티 (0~100 clamp).
+    // 1B당 +10 pt 정도면 800M ~ 2B 레인지에서 의미있는 변동
+    const totalAd = s.decisions.adBudget.search + s.decisions.adBudget.display + s.decisions.adBudget.influencer;
+    const adGrowth = totalAd / 100_000_000;
+    const eventPenalty = s.currentEvent.effects.brandEquityPenalty ?? 0;
+    const dilutionPenalty = s.decisions.financing.newEquity / 1_000_000_000; // 증자 1B당 -1 pt
+    const newBrandEquity = Math.max(0, Math.min(100, s.brandEquity * 0.9 + adGrowth - eventPenalty - dilutionPenalty));
+
+    const nextEvent = rollEvent(nextRound);
+
     return {
       roundHistory: [...s.roundHistory, snapshot],
       currentRound: nextRound,
@@ -129,6 +153,8 @@ export const useGameStore = create<GameState & GameActions>()(
       chatHistories: { jiyeon: [], minsoo: [], soonja: [] },
       step: 'decision' as const,
       gameOver: nextRound > s.maxRounds,
+      currentEvent: nextEvent,
+      brandEquity: newBrandEquity,
     };
   }),
 
@@ -136,9 +162,16 @@ export const useGameStore = create<GameState & GameActions>()(
     }),
     {
       name: 'bizsim-game',
-      version: 1,
+      version: 4,
       skipHydration: true,
       storage: createJSONStorage(() => localStorage),
+      migrate: (persisted: unknown, version: number) => {
+        // Decisions 구조가 여러 번 바뀌었으므로 v4 이전 세션은 안전하게 초기 상태로 리셋한다.
+        if (version < 4) {
+          return initialState;
+        }
+        return persisted;
+      },
       partialize: (state) => ({
         currentRound: state.currentRound,
         maxRounds: state.maxRounds,
@@ -155,6 +188,8 @@ export const useGameStore = create<GameState & GameActions>()(
         gameOver: state.gameOver,
         roundDebriefs: state.roundDebriefs,
         finalDebrief: state.finalDebrief,
+        currentEvent: state.currentEvent,
+        brandEquity: state.brandEquity,
       }),
     },
   ),

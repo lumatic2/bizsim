@@ -13,7 +13,7 @@ import { SERVER_ERROR_MESSAGE } from '@/lib/errors';
 export default function InterviewPage() {
   const router = useRouter();
   const {
-    decisions, chatHistories, selectedPersona, competitors, currentRound, qualityCap, previousBS,
+    decisions, chatHistories, selectedPersona, competitors, currentRound, qualityCap, previousBS, currentEvent, brandEquity,
     setSelectedPersona, addMessage, appendToLastAssistant,
     setResults, setFinancials,
   } = useGameStore();
@@ -63,9 +63,9 @@ export default function InterviewPage() {
 
   const handleRunSimulation = () => {
     const marketSize = getMarketSize(currentRound);
-    const results = runSimulation(decisions, competitors, marketSize, qualityCap);
+    const results = runSimulation(decisions, competitors, marketSize, qualityCap, currentEvent, brandEquity);
     setResults(results);
-    const financials = generateFinancials(decisions, results, previousBS);
+    const financials = generateFinancials(decisions, results, previousBS, currentEvent);
     setFinancials(financials);
     router.push('/play/results');
   };
